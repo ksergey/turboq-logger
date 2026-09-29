@@ -16,11 +16,10 @@
 Everything else is fetched automatically at configure time via [CPM.cmake](https://github.com/cpm-cmake/CPM.cmake)
 (the first configure needs network access):
 
-- [turboq](https://github.com/ksergey/turboq) -- message queues; pinned to a commit via `turboq_logger_TURBOQ_TAG`.
-  Only the library is built: turboq's own tests, tools and Python bindings are switched off.
+- [turboq](https://github.com/ksergey/turboq) -- message queues (tracks `master`)
+- [fmt](https://github.com/fmtlib/fmt) -- formatting
 - [doctest](https://github.com/doctest/doctest) -- unit tests (`code/turboq_logger/*_test.cpp`); skipped when
   `-Dturboq_logger_BUILD_TESTS=OFF`
-- [cxxopts](https://github.com/jarro2783/cxxopts) -- command-line parsing for `tools/`
 
 Set `CPM_SOURCE_CACHE` to share downloaded dependencies between build directories and projects.
 
@@ -28,11 +27,8 @@ Set `CPM_SOURCE_CACHE` to share downloaded dependencies between build directorie
 
 | Option | Default | Effect |
 |---|---|---|
+| `turboq_logger_TSC_CLOCK` | `ON` | Timestamp log entries with the TSC (`rdtsc`, x86-64 only; needs an invariant TSC) instead of `clock_gettime(CLOCK_REALTIME)`. Defines `TURBOQ_LOGGER_TSC_CLOCK` publicly, so code linking `turboq::logger` sees the same choice. |
 | `turboq_logger_BUILD_TESTS` | `ON` | Build `*_test.cpp` files as doctest executables and register them with `ctest`. |
-| `turboq_logger_TOOLS` | `ON` | Build tools under [`tools/`](tools/). |
-| `turboq_logger_SANITIZER` | `OFF` | Build with ASan/UBSan/LeakSanitizer (forwarded to turboq). |
-| `turboq_logger_TSAN` | `OFF` | Build with ThreadSanitizer (forwarded to turboq). |
-| `turboq_logger_TURBOQ_TAG` | pinned commit | turboq git tag/commit to fetch. |
 
 ```bash
 cmake -B build -DCMAKE_CXX_COMPILER=g++-14
@@ -54,7 +50,7 @@ CPMAddPackage(
     NAME turboq-logger
     GITHUB_REPOSITORY ksergey/turboq-logger
     GIT_TAG master
-    OPTIONS "turboq_logger_BUILD_TESTS OFF" "turboq_logger_TOOLS OFF")
+    OPTIONS "turboq_logger_BUILD_TESTS OFF")
 
 target_link_libraries(your_app PRIVATE turboq::logger)
 ```
