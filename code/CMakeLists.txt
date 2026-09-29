@@ -15,6 +15,11 @@ target_include_directories(${TargetName}
 target_link_libraries(${TargetName}
     PUBLIC turboq::turboq fmt::fmt)
 
+if (turboq_logger_BUILD_TESTS)
+    target_compile_definitions(${TargetName}
+        PUBLIC -DTURBOQ_LOGGER_TSC_CLOCK)
+endif()
+
 file(GLOB_RECURSE Sources "${CMAKE_CURRENT_SOURCE_DIR}/turboq_logger/*.cpp")
 file(GLOB_RECURSE Headers "${CMAKE_CURRENT_SOURCE_DIR}/turboq_logger/*.h")
 
