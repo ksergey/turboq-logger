@@ -13,27 +13,7 @@ target_compile_options(${TargetName}
 target_include_directories(${TargetName}
     PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 target_link_libraries(${TargetName}
-    PUBLIC turboq::turboq)
-
-if (turboq_logger_SANITIZER AND turboq_logger_TSAN)
-    message(FATAL_ERROR "turboq_logger_SANITIZER (ASan/UBSan/LeakSanitizer) and turboq_logger_TSAN (ThreadSanitizer) "
-        "cannot be enabled at the same time -- they instrument the binary in incompatible ways. "
-        "Build twice, once with each, instead.")
-endif()
-
-if (turboq_logger_SANITIZER)
-    target_compile_options(${TargetName}
-        PUBLIC -fsanitize=address,leak,undefined)
-    target_link_options(${TargetName}
-        PUBLIC -fsanitize=address,leak,undefined)
-endif()
-
-if (turboq_logger_TSAN)
-    target_compile_options(${TargetName}
-        PUBLIC -fsanitize=thread)
-    target_link_options(${TargetName}
-        PUBLIC -fsanitize=thread)
-endif()
+    PUBLIC turboq::turboq fmt::fmt)
 
 file(GLOB_RECURSE Sources "${CMAKE_CURRENT_SOURCE_DIR}/turboq_logger/*.cpp")
 file(GLOB_RECURSE Headers "${CMAKE_CURRENT_SOURCE_DIR}/turboq_logger/*.h")
