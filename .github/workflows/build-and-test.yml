@@ -8,7 +8,7 @@ env:
 
 jobs:
   build:
-    name: ${{ matrix.build_type }} build with ${{ matrix.compiler }} on ${{ matrix.os }}
+    name: ${{ matrix.build_type }} build with ${{ matrix.compiler }} on ${{ matrix.os }} (TSC clock ${{ matrix.tsc_clock }})
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -16,6 +16,9 @@ jobs:
         build_type: [ 'Debug', 'Release' ]
         os: [ 'ubuntu-24.04' ]
         compiler: [ 'gcc-14', 'gcc-15', 'gcc-16', 'clang-20', 'clang-21', 'clang-22' ]
+        # turboq_logger_TSC_CLOCK switches turboq::logger::Clock between TscClock (rdtsc) and
+        # clock_gettime(CLOCK_REALTIME) at compile time -- build and test both variants
+        tsc_clock: [ 'ON', 'OFF' ]
 
     steps:
       - uses: actions/checkout@v7
@@ -149,6 +152,7 @@ jobs:
               -DCMAKE_CXX_COMPILER=${{ env.CXX }}
               -DCMAKE_VERBOSE_MAKEFILE=ON
               -DCMAKE_BUILD_TYPE=${{ matrix.build_type }}
+              -Dturboq_logger_TSC_CLOCK=${{ matrix.tsc_clock }}
             RESULT_VARIABLE result
           )
           if (NOT result EQUAL 0)
