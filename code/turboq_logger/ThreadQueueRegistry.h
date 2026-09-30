@@ -48,7 +48,11 @@ private:
     std::vector<Consumer> consumers_;
 
     // Consumers of newly created queues, waiting for the backend to pick them up. hasPending_ lets
-    // forEachConsumer() skip the mutex when there are none (the common case).
+    // forEachConsumer() skip the mutex when there are none (the common case). It is only a hint, so
+    // relaxed is enough: pending_ itself is synchronized by the mutex, and the flag is set while
+    // holding it, so a backend that saw it set and then takes the lock sees the new consumers. Its
+    // exchange() reads the latest value, so a consumer added meanwhile keeps the flag set for the
+    // next call rather than being missed.
     std::mutex pendingMutex_;
     std::vector<Consumer> pending_;
     std::atomic<bool> hasPending_{false};

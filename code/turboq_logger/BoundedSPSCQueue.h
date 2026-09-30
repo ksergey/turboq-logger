@@ -103,8 +103,11 @@ public:
     ~Producer() {
         if (impl_) {
             // release: pairs with the consumer's acquire load in closed(), so once the consumer
-            // sees closed == true it also sees every message this producer committed
-            std::atomic_ref(this->control().closed).store(true, std::memory_order_relaxed);
+            // sees closed == true it also sees every message this producer committed. Must not be
+            // relaxed: then closed == true could become visible before the last commit(), and the
+            // consumer would report closed() on a queue that still holds messages -- and lose them.
+            // Free on x86 (a plain store either way).
+            std::atomic_ref(this->control().closed).store(true, std::memory_order_release);
         }
     }
 
@@ -208,9 +211,11 @@ public:
     /// the queue is never marked closed.
     [[nodiscard]] TURBOQ_FORCE_INLINE auto closed() noexcept -> bool {
         // acquire pairs with the producer's release store: after it, fetch() is guaranteed to
-        // observe the producer's final position. fetch() doesn't advance the queue, so calling it
-        // here has no effect on the caller's own fetch()/consume() sequence.
-        return std::atomic_ref(control().closed).load(std::memory_order_relaxed) && impl_.fetch().empty();
+        // observe the producer's final position. With relaxed, fetch() could read a stale position,
+        // see an empty queue and report closed() while messages are still pending. Free on x86 (a
+        // plain load either way). fetch() doesn't advance the queue, so calling it here has no
+        // effect on the caller's own fetch()/consume() sequence.
+        return std::atomic_ref(control().closed).load(std::memory_order_acquire) && impl_.fetch().empty();
     }
 
 private:
