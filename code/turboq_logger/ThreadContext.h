@@ -22,11 +22,13 @@ public:
     ThreadContext(ThreadContext&&) = default;
     ThreadContext& operator=(ThreadContext&&) = default;
 
-    ThreadContext(ThreadQueueRegistry& registry)
+    /// Create a new queue in the registry for the calling thread. Explicit: converting a registry
+    /// implicitly would silently create a queue.
+    explicit ThreadContext(ThreadQueueRegistry& registry)
         : producer_{registry.createProducer()}, threadID_{std::this_thread::get_id()} {}
 
     /// Get producer for queue
-    [[nodiscard]] TURBOQ_FORCE_INLINE auto producer() noexcept -> LoggerQueue::Producer& {
+    [[nodiscard]] TURBOQ_FORCE_INLINE auto producer() noexcept -> BoundedSPSCQueue::Producer& {
         return producer_;
     }
 
