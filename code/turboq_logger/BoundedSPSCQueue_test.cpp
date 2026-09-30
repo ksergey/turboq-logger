@@ -33,6 +33,19 @@ TEST_SUITE("BoundedSPSCQueue") {
         return std::move(result).value();
     }
 
+    TEST_CASE("defaults to anonymous memory") {
+        // no memory source given: nothing is created on disk or in /dev/shm, and each queue is a
+        // separate anonymous file, so the same name never refers to the same queue
+        auto first = BoundedSPSCQueue::makeQueue(
+            "anonymous", BoundedSPSCQueue::CreationOptions{.capacityHint = 4096});
+        REQUIRE(first);
+        auto second = BoundedSPSCQueue::makeQueue(
+            "anonymous", BoundedSPSCQueue::CreationOptions{.capacityHint = 8192});
+        REQUIRE(second); // a named queue would fail here with SizeMismatch
+
+        CHECK_FALSE(BoundedSPSCQueue::makeQueue("anonymous")); // open-only never finds it
+    }
+
     TEST_CASE("messages round-trip in order across many wraps") {
         auto queue = makeQueue(4096); // ~30 messages fit: 10000 of them wrap hundreds of times
         auto producer = queue.createProducer();

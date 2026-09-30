@@ -1,0 +1,94 @@
+// Copyright (c) Sergey Kovalevich <inndie@gmail.com>
+// SPDX-License-Identifier: MIT
+
+#pragma once
+
+#include <atomic>
+#include <cstddef>
+#include <mutex>
+#include <vector>
+
+#include "BoundedSPSCQueue.h"
+
+namespace turboq::logger {
+
+/// Creates a BoundedSPSCQueue per producer, and gives one thread (the backend) access to the
+/// consumers of all of them.
+///
+/// Every createProducer() call creates a new queue and hands out its producer; the registry keeps
+/// the consumer. Whoever owns the producer decides how long the queue lives -- typically one per
+/// thread, kept in thread-local storage, so the queue closes when the thread exits. The backend
+/// visits the consumers with forEachConsumer(), which also drops each consumer once its producer
+/// is destroyed and its queue is fully drained -- so no message is lost:
+///
+///     // any application thread
+///     thread_local auto producer = registry.createProducer();
+///     if (auto buffer = producer.prepare(size); !buffer.empty()) { ...; producer.commit(); }
+///
+///     // backend thread
+///     while (running) {
+///         registry.forEachConsumer([](BoundedSPSCQueue::Consumer& consumer) {
+///             while (auto buffer = consumer.fetch(); !buffer.empty()) { ...; consumer.consume(); }
+///         });
+///     }
+///
+/// Queues live in anonymous memory: they are private to the process.
+///
+/// Lifetime: the registry must outlive its forEachConsumer() calls, but not the producers. A
+/// producer kept past the registry's destruction still owns a valid queue; its messages are just
+/// never read, and once the queue is full prepare() returns an empty buffer.
+class ThreadQueueRegistry {
+private:
+    using Consumer = BoundedSPSCQueue::Consumer;
+    using Producer = BoundedSPSCQueue::Producer;
+
+    BoundedSPSCQueue::CreationOptions const options_;
+
+    // Owned by the backend: only forEachConsumer() touches it, without a lock
+    std::vector<Consumer> consumers_;
+
+    // Consumers of newly created queues, waiting for the backend to pick them up. hasPending_ lets
+    // forEachConsumer() skip the mutex when there are none (the common case).
+    std::mutex pendingMutex_;
+    std::vector<Consumer> pending_;
+    std::atomic<bool> hasPending_{false};
+
+public:
+    ThreadQueueRegistry(ThreadQueueRegistry const&) = delete;
+    ThreadQueueRegistry& operator=(ThreadQueueRegistry const&) = delete;
+
+    /// Every queue is created with these options
+    explicit ThreadQueueRegistry(BoundedSPSCQueue::CreationOptions const& options);
+
+    ~ThreadQueueRegistry();
+
+    /// Create a new queue and return its producer; the queue's consumer is added to the ones
+    /// forEachConsumer() visits. Thread-safe. Throws std::system_error if the queue couldn't be
+    /// created.
+    [[nodiscard]] auto createProducer() -> Producer;
+
+    /// Call fn(Consumer&) for the consumer of every queue, then drop the consumers whose producer
+    /// has been destroyed and whose queue has been drained (see BoundedSPSCQueue::Consumer::closed()).
+    /// Return the number of consumers left.
+    ///
+    /// Backend only: must not be called from more than one thread at a time.
+    template <typename Fn>
+    auto forEachConsumer(Fn&& fn) -> std::size_t {
+        if (hasPending_.exchange(false, std::memory_order_relaxed)) [[unlikely]] {
+            this->adoptPending();
+        }
+        for (auto& consumer : consumers_) {
+            fn(consumer);
+        }
+        // TODO guard with flag?
+        std::erase_if(consumers_, [](Consumer& consumer) {
+            return consumer.closed();
+        });
+        return consumers_.size();
+    }
+
+private:
+    void adoptPending();
+};
+
+} // namespace turboq::logger

@@ -56,13 +56,16 @@ private:
 public:
     BoundedSPSCQueue() = default;
 
-    /// Construct queue (open or create), throws std::system_error on error
-    BoundedSPSCQueue(
-        std::string_view name, CreationOptions const& options, MemorySource const& memorySource = DefaultMemorySource{})
+    /// Construct queue (open or create), throws std::system_error on error.
+    /// Defaults to anonymous memory: a queue private to the process, with no file left behind.
+    BoundedSPSCQueue(std::string_view name, CreationOptions const& options,
+        MemorySource const& memorySource = AnonymousMemorySource{})
         : impl_{name, options, memorySource} {}
 
-    /// Construct queue (open only), throws std::system_error on error
-    explicit BoundedSPSCQueue(std::string_view name, MemorySource const& memorySource = DefaultMemorySource{})
+    /// Construct queue (open only), throws std::system_error on error.
+    /// Opening only makes sense for a named memory source (e.g. DefaultMemorySource): an anonymous
+    /// one, the default, never finds an existing queue.
+    explicit BoundedSPSCQueue(std::string_view name, MemorySource const& memorySource = AnonymousMemorySource{})
         : impl_{name, memorySource} {}
 
     template <typename... Args>
@@ -101,7 +104,7 @@ public:
         if (impl_) {
             // release: pairs with the consumer's acquire load in closed(), so once the consumer
             // sees closed == true it also sees every message this producer committed
-            std::atomic_ref(this->control().closed).store(true, std::memory_order_release);
+            std::atomic_ref(this->control().closed).store(true, std::memory_order_relaxed);
         }
     }
 
@@ -207,7 +210,7 @@ public:
         // acquire pairs with the producer's release store: after it, fetch() is guaranteed to
         // observe the producer's final position. fetch() doesn't advance the queue, so calling it
         // here has no effect on the caller's own fetch()/consume() sequence.
-        return std::atomic_ref(control().closed).load(std::memory_order_acquire) && impl_.fetch().empty();
+        return std::atomic_ref(control().closed).load(std::memory_order_relaxed) && impl_.fetch().empty();
     }
 
 private:
