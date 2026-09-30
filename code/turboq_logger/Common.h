@@ -21,7 +21,7 @@ enum class LogLevel { Always, Error, Warning, Notice, Debug, Trace };
 /// Decode args function signature
 using DecodeArgsFn = std::add_pointer_t<void(std::byte const*, fmt::dynamic_format_arg_store<fmt::format_context>*)>;
 
-/// Decode args for log entry from a buffer
+/// Format a log entry from a buffer into a string
 using FormatFn = std::add_pointer_t<std::string(std::byte const*)>;
 
 /// Log entry message meta
@@ -35,7 +35,7 @@ struct LogEntryMessageMeta {
     /// Function to decode log entry args from a buffer
     DecodeArgsFn decodeArgs;
 };
-static_assert(std::is_trivially_copyable_v<LogEntryMeta>);
+static_assert(std::is_trivially_copyable_v<LogEntryMessageMeta>);
 
 /// Log entry counter meta
 struct LogEntryCounterMeta {
