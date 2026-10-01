@@ -14,8 +14,8 @@ ThreadQueueRegistry::~ThreadQueueRegistry() = default;
 
 auto ThreadQueueRegistry::createProducer() -> Producer {
     // Anonymous memory (BoundedSPSCQueue's default). The queue object itself isn't kept: producer
-    // and consumer each own their mapping of it.
-    auto queue = BoundedSPSCQueue{"turboq-logger-queue", options_};
+    // and consumer each own their mapping of it. Created outside the lock: mapping memory is slow.
+    auto queue = BoundedSPSCQueue{"turboq-logger-queue", creationOptions()};
     auto consumer = queue.createConsumer();
     auto producer = queue.createProducer();
 
@@ -26,6 +26,16 @@ auto ThreadQueueRegistry::createProducer() -> Producer {
     }
 
     return producer;
+}
+
+void ThreadQueueRegistry::setCreationOptions(BoundedSPSCQueue::CreationOptions const& options) {
+    std::lock_guard lock{pendingMutex_};
+    options_ = options;
+}
+
+auto ThreadQueueRegistry::creationOptions() -> BoundedSPSCQueue::CreationOptions {
+    std::lock_guard lock{pendingMutex_};
+    return options_;
 }
 
 void ThreadQueueRegistry::adoptPending() {

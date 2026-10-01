@@ -3,6 +3,7 @@
 
 #pragma once
 
+#include <cstdint>
 #include <source_location>
 #include <string>
 #include <string_view>
@@ -42,6 +43,9 @@ struct LogEntryCounterMeta {
     int counterID;
 };
 
+/// Type of the counter value in a counter log entry (see Layout below)
+using LogCounterValue = std::int64_t;
+
 /// Log entry type
 enum LogEntryType { Message, Counter };
 
@@ -58,6 +62,6 @@ static_assert(std::is_trivially_copyable_v<LogEntryHeader>);
 
 /// Layout
 ///   v1: | LogEntryHeader{type = LogEntryType::Message} | LogEntryMessageMeta* | Args... |
-///   v2: | LogEntryHeader{type = LogEntryType::Counter} | LogEntryCounterMeta* | counter value |
+///   v2: | LogEntryHeader{type = LogEntryType::Counter} | LogEntryCounterMeta* | LogCounterValue |
 
 } // namespace turboq::logger

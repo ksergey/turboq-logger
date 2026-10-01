@@ -42,8 +42,6 @@ private:
     using Consumer = BoundedSPSCQueue::Consumer;
     using Producer = BoundedSPSCQueue::Producer;
 
-    BoundedSPSCQueue::CreationOptions const options_;
-
     // Owned by the backend: only forEachConsumer() touches it, without a lock
     std::vector<Consumer> consumers_;
 
@@ -55,13 +53,14 @@ private:
     // next call rather than being missed.
     std::mutex pendingMutex_;
     std::vector<Consumer> pending_;
+    BoundedSPSCQueue::CreationOptions options_; // guarded by pendingMutex_
     std::atomic<bool> hasPending_{false};
 
 public:
     ThreadQueueRegistry(ThreadQueueRegistry const&) = delete;
     ThreadQueueRegistry& operator=(ThreadQueueRegistry const&) = delete;
 
-    /// Every queue is created with these options
+    /// Queues are created with these options (see setCreationOptions())
     explicit ThreadQueueRegistry(BoundedSPSCQueue::CreationOptions const& options);
 
     ~ThreadQueueRegistry();
@@ -70,6 +69,12 @@ public:
     /// forEachConsumer() visits. Thread-safe. Throws std::system_error if the queue couldn't be
     /// created.
     [[nodiscard]] auto createProducer() -> Producer;
+
+    /// Options for queues created from now on; existing queues keep theirs. Thread-safe.
+    void setCreationOptions(BoundedSPSCQueue::CreationOptions const& options);
+
+    /// Options new queues are created with. Thread-safe.
+    [[nodiscard]] auto creationOptions() -> BoundedSPSCQueue::CreationOptions;
 
     /// Call fn(Consumer&) for the consumer of every queue, then drop the consumers whose producer
     /// has been destroyed and whose queue has been drained (see BoundedSPSCQueue::Consumer::closed()).
