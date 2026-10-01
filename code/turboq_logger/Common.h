@@ -19,6 +19,26 @@ namespace turboq::logger {
 /// Log entry verbosity level
 enum class LogLevel { Always, Error, Warning, Notice, Debug, Trace };
 
+/// Name of a log level, e.g. "NOTICE". Not called toString(): test frameworks (doctest) and other
+/// libraries use that name as an ADL customization point with their own return type.
+[[nodiscard]] constexpr auto logLevelName(LogLevel level) noexcept -> std::string_view {
+    switch (level) {
+    case LogLevel::Always:
+        return "ALWAYS";
+    case LogLevel::Error:
+        return "ERROR";
+    case LogLevel::Warning:
+        return "WARNING";
+    case LogLevel::Notice:
+        return "NOTICE";
+    case LogLevel::Debug:
+        return "DEBUG";
+    case LogLevel::Trace:
+        return "TRACE";
+    }
+    return "UNKNOWN";
+}
+
 /// Decode args function signature
 using DecodeArgsFn = std::add_pointer_t<void(std::byte const*, fmt::dynamic_format_arg_store<fmt::format_context>*)>;
 
@@ -61,7 +81,10 @@ struct LogEntryHeader {
 static_assert(std::is_trivially_copyable_v<LogEntryHeader>);
 
 /// Layout
-///   v1: | LogEntryHeader{type = LogEntryType::Message} | LogEntryMessageMeta* | Args... |
-///   v2: | LogEntryHeader{type = LogEntryType::Counter} | LogEntryCounterMeta* | LogCounterValue |
+///   v1: | LogEntryHeader{type = LogEntryType::Message} | EntryData | LogEntryMessageMeta* | Args... |
+///   v2: | LogEntryHeader{type = LogEntryType::Counter} | EntryData | LogEntryCounterMeta* | LogCounterValue |
+///
+/// EntryData belongs to the ordering policy (see Ordering.h) and is empty unless it needs data in
+/// the entry (SequenceOrdering: the sequence number).
 
 } // namespace turboq::logger

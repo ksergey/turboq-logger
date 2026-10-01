@@ -3,6 +3,7 @@
 
 #pragma once
 
+#include <bit>
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
@@ -68,8 +69,11 @@ struct Codec<std::string_view> {
 
     static void encode(std::byte*& dest, std::string_view const& value) noexcept {
         SizeCodec::encode(dest, value.size());
-        std::memcpy(dest, value.data(), value.size());
-        dest += value.size();
+        // an empty string_view may have a null data(), and memcpy from null is undefined even for 0 bytes
+        if (!value.empty()) {
+            std::memcpy(dest, value.data(), value.size());
+            dest += value.size();
+        }
     }
 
     static auto decode(std::byte const*& src) noexcept -> std::string_view {

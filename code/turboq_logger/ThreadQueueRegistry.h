@@ -6,6 +6,7 @@
 #include <atomic>
 #include <cstddef>
 #include <mutex>
+#include <span>
 #include <vector>
 
 #include "BoundedSPSCQueue.h"
@@ -83,12 +84,23 @@ public:
     /// Backend only: must not be called from more than one thread at a time.
     template <typename Fn>
     auto forEachConsumer(Fn&& fn) -> std::size_t {
+        return visitConsumers([&](std::span<Consumer> consumers) {
+            for (auto& consumer : consumers) {
+                fn(consumer);
+            }
+        });
+    }
+
+    /// Like forEachConsumer(), but calls fn(std::span<Consumer>) once with all consumers -- for
+    /// callers that need every queue at once (e.g. to merge their entries).
+    ///
+    /// Backend only: must not be called from more than one thread at a time.
+    template <typename Fn>
+    auto visitConsumers(Fn&& fn) -> std::size_t {
         if (hasPending_.exchange(false, std::memory_order_relaxed)) [[unlikely]] {
             this->adoptPending();
         }
-        for (auto& consumer : consumers_) {
-            fn(consumer);
-        }
+        fn(std::span<Consumer>{consumers_});
         // TODO guard with flag?
         std::erase_if(consumers_, [](Consumer& consumer) {
             return consumer.closed();
