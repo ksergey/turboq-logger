@@ -26,8 +26,11 @@ struct ClockGetTime {
     }
 };
 
-/// TSC based clock
-struct TscClock {
+#if defined(__x86_64__)
+#define TURBOQ_LOGGER_HAS_TSC_CLOCK 1
+
+/// TSC based clock (x86-64 only; needs an invariant TSC)
+struct TSCClock {
     using Timestamp = std::int64_t;
 
     [[nodiscard]] TURBOQ_FORCE_INLINE static auto now() noexcept -> Timestamp {
@@ -36,13 +39,15 @@ struct TscClock {
 
     [[nodiscard]] static auto toTimeSpec(std::int64_t value) noexcept -> ::timespec;
 };
+#endif
 
 #if defined(TURBOQ_LOGGER_TSC_CLOCK)
-using Clock = TscClock;
+#if !defined(TURBOQ_LOGGER_HAS_TSC_CLOCK)
+#error "TURBOQ_LOGGER_TSC_CLOCK requires x86-64: configure with -Dturboq_logger_TSC_CLOCK=OFF"
+#endif
+using Clock = TSCClock;
 #else
 using Clock = ClockGetTime<CLOCK_REALTIME>;
 #endif
-
-using Timestamp = Clock::Timestamp;
 
 } // namespace turboq::logger

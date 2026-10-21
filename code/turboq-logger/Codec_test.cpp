@@ -58,6 +58,33 @@ TEST_SUITE("Codec") {
         CHECK_EQ(Codec<char>::decode(src), 'z');
         CHECK_EQ(src, dest);
     }
+
+    TEST_CASE("a string longer than the size field can hold is truncated, consistently in size and encoding") {
+        using StringCodec = Codec<std::string_view>;
+
+        // only size() is looked at: no 4 GiB buffer needed
+        char const dummy = 'x';
+        auto const huge = std::string_view{&dummy, StringCodec::kMaxSize + 100};
+        CHECK_EQ(StringCodec::encodedLength(huge), StringCodec::kMaxSize);
+        CHECK_EQ(StringCodec::encodedSize(huge), sizeof(StringCodec::SizeType) + StringCodec::kMaxSize);
+
+        auto const exact = std::string_view{&dummy, StringCodec::kMaxSize};
+        CHECK_EQ(StringCodec::encodedLength(exact), StringCodec::kMaxSize);
+
+        CHECK_EQ(StringCodec::encodedLength("abc"), 3);
+    }
+
+    TEST_CASE("an empty string encodes as just its size, whatever its data pointer") {
+        std::array<std::byte, 16> buffer{};
+        std::byte* dest = buffer.data();
+        Codec<std::string_view>::encode(dest, std::string_view{}); // data() == nullptr
+        Codec<std::string_view>::encode(dest, std::string_view{"abc", 0});
+        CHECK_EQ(dest - buffer.data(), 2 * sizeof(std::uint32_t));
+
+        std::byte const* src = buffer.data();
+        CHECK(Codec<std::string_view>::decode(src).empty());
+        CHECK(Codec<std::string_view>::decode(src).empty());
+    }
 }
 
 } // namespace turboq::logger::testing
