@@ -5,7 +5,6 @@ project(turboq-logger CXX)
 option(turboq_logger_TSC_CLOCK "Use TSC clock instead of wall clock" ON)
 option(turboq_logger_BUILD_TESTS "Build tests (*_test.cpp files, linked against doctest)" ON)
 
-include(cmake/TurboQLoggerHelpers.cmake)
 include(cmake/GetCPM.cmake)
 
 CPMAddPackage("gh:fmtlib/fmt#12.2.0")

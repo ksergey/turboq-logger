@@ -27,7 +27,7 @@ struct ClockGetTime {
 };
 
 /// TSC based clock
-struct TscClock {
+struct TSCClock {
     using Timestamp = std::int64_t;
 
     [[nodiscard]] TURBOQ_FORCE_INLINE static auto now() noexcept -> Timestamp {
@@ -38,11 +38,9 @@ struct TscClock {
 };
 
 #if defined(TURBOQ_LOGGER_TSC_CLOCK)
-using Clock = TscClock;
+using Clock = TSCClock;
 #else
 using Clock = ClockGetTime<CLOCK_REALTIME>;
 #endif
-
-using Timestamp = Clock::Timestamp;
 
 } // namespace turboq::logger

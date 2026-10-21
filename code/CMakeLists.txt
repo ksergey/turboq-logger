@@ -24,18 +24,19 @@ file(GLOB_RECURSE Sources "${CMAKE_CURRENT_SOURCE_DIR}/turboq_logger/*.cpp")
 file(GLOB_RECURSE Headers "${CMAKE_CURRENT_SOURCE_DIR}/turboq_logger/*.h")
 
 if (turboq_logger_BUILD_TESTS)
-    TurboQLoggerAddTestsFromSourceList(Sources
+    find_package(Threads REQUIRED)
+    TurboQAddTestsFromSourceList(Sources
         PREFIX ${TargetName}
         COMPILE_OPTIONS -Wall -Wextra -g
-        LIBS doctest::doctest_with_main ${TargetName})
+        LIBS doctest::doctest_with_main Threads::Threads ${TargetName})
 endif()
 
-TurboQLoggerAddBenchmarksFromSourceList(Sources
+TurboQAddBenchmarksFromSourceList(Sources
     PREFIX ${TargetName}
     COMPILE_OPTIONS -Wall -Wextra -g
     LIBS benchmark::benchmark_main ${TargetName})
 
-TurboQLoggerExcludeTestsAndBenchmarksFromSourceList(Sources)
+TurboQExcludeTestsAndBenchmarksFromSourceList(Sources)
 
 foreach(file ${Headers})
     target_sources(${TargetName} PUBLIC ${file})

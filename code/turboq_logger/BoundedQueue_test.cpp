@@ -1,7 +1,7 @@
 // Copyright (c) Sergey Kovalevich <inndie@gmail.com>
 // SPDX-License-Identifier: MIT
 
-#include "ClosableSPSCMessageQueue.h"
+#include "BoundedQueue.h"
 
 #include <cstdint>
 #include <optional>
@@ -11,24 +11,21 @@
 
 #include <doctest/doctest.h>
 
-#include <turboq/SPSCMessageQueue.h>
 #include <turboq/TestUtils.h>
 
 namespace turboq::logger::testing {
 
 using ::turboq::testing::dequeue;
 using ::turboq::testing::enqueue;
-using ::turboq::testing::MemorySourceFixture;
 
-TEST_SUITE("ClosableSPSCMessageQueue") {
+TEST_SUITE("BoundedQueue") {
 
     struct Message {
         std::uint64_t seq;
     };
 
-    auto makeQueue(std::size_t capacityHint = 1024 * 1024) -> ClosableSPSCMessageQueue {
-        auto result = ClosableSPSCMessageQueue::makeQueue(
-            "test", ClosableSPSCMessageQueue::CreationOptions{.capacityHint = capacityHint}, AnonymousMemorySource{});
+    auto makeQueue(std::size_t capacityHint = 1024 * 1024) -> BoundedQueue {
+        auto result = BoundedQueue::makeQueue("test", BoundedQueue::CreationOptions{.capacityHint = capacityHint});
         REQUIRE(result);
         return std::move(result).value();
     }
@@ -57,8 +54,7 @@ TEST_SUITE("ClosableSPSCMessageQueue") {
         CHECK_EQ(queue.createProducer().capacity(), 4 * pageSize);
         CHECK_EQ(queue.createConsumer().capacity(), 4 * pageSize);
 
-        auto const invalid = ClosableSPSCMessageQueue::makeQueue(
-            "invalid", ClosableSPSCMessageQueue::CreationOptions{.capacityHint = 0}, AnonymousMemorySource{});
+        auto const invalid = BoundedQueue::makeQueue("invalid", BoundedQueue::CreationOptions{.capacityHint = 0});
         REQUIRE_FALSE(invalid);
         CHECK_EQ(invalid.error(), makeErrorCode(Error::InvalidCreationOptions));
     }
@@ -90,7 +86,7 @@ TEST_SUITE("ClosableSPSCMessageQueue") {
         auto queue = makeQueue();
         auto consumer = queue.createConsumer();
 
-        std::optional<ClosableSPSCMessageQueue::Producer> holder{queue.createProducer()};
+        std::optional<BoundedQueue::Producer> holder{queue.createProducer()};
         auto producer = std::move(*holder);
         holder.reset();
         CHECK_FALSE(consumer.closed());
@@ -98,30 +94,6 @@ TEST_SUITE("ClosableSPSCMessageQueue") {
         auto otherQueue = makeQueue();
         producer = otherQueue.createProducer();
         CHECK(consumer.closed());
-    }
-
-    TEST_CASE_FIXTURE(MemorySourceFixture, "a new producer re-opens a closed queue") {
-        auto const memorySource = makeTempMemorySource();
-        auto const options = ClosableSPSCMessageQueue::CreationOptions{.capacityHint = 8192};
-
-        auto consumer = ClosableSPSCMessageQueue::makeConsumer("reopen", options, memorySource);
-        REQUIRE(consumer);
-
-        {
-            // separate handle, as if from another process
-            auto producer = ClosableSPSCMessageQueue::makeProducer("reopen", memorySource);
-            REQUIRE(producer);
-        }
-        CHECK(consumer->closed());
-
-        auto producer = ClosableSPSCMessageQueue::makeProducer("reopen", memorySource);
-        REQUIRE(producer);
-        CHECK_FALSE(consumer->closed());
-
-        Message msg;
-        REQUIRE(enqueue(*producer, Message{.seq = 7}));
-        REQUIRE(dequeue(*consumer, msg));
-        CHECK_EQ(msg.seq, 7);
     }
 
     TEST_CASE("consumer on another thread receives everything before seeing closed()") {
@@ -152,43 +124,6 @@ TEST_SUITE("ClosableSPSCMessageQueue") {
 
         CHECK(inOrder);
         CHECK_EQ(expected, kMessageCount);
-    }
-
-    TEST_CASE_FIXTURE(MemorySourceFixture, "errors") {
-        auto const memorySource = makeTempMemorySource();
-        auto const options = ClosableSPSCMessageQueue::CreationOptions{.capacityHint = 8192};
-
-        auto queue = ClosableSPSCMessageQueue::makeQueue("errors", options, memorySource);
-        REQUIRE(queue);
-
-        SUBCASE("only one producer and one consumer") {
-            auto producer = queue->createProducer();
-            auto consumer = queue->createConsumer();
-            CHECK_THROWS_AS((void)queue->createProducer(), std::system_error);
-            CHECK_THROWS_AS((void)queue->createConsumer(), std::system_error);
-            CHECK_FALSE(ClosableSPSCMessageQueue::makeProducer("errors", memorySource));
-            CHECK_FALSE(ClosableSPSCMessageQueue::makeConsumer("errors", memorySource));
-        }
-
-        SUBCASE("capacity mismatch") {
-            auto const other = ClosableSPSCMessageQueue::makeQueue(
-                "errors", ClosableSPSCMessageQueue::CreationOptions{.capacityHint = 16384}, memorySource);
-            REQUIRE_FALSE(other);
-            CHECK_EQ(other.error(), makeErrorCode(Error::SizeMismatch));
-        }
-
-        SUBCASE("opening a queue that doesn't exist") {
-            CHECK_FALSE(ClosableSPSCMessageQueue::makeQueue("missing", memorySource));
-        }
-
-        SUBCASE("a plain turboq SPSC queue is not a closable one") {
-            auto const spsc = ::turboq::SPSCMessageQueue::makeQueue(
-                "plain", ::turboq::SPSCMessageQueue::CreationOptions{.capacityHint = 8192}, memorySource);
-            REQUIRE(spsc);
-            auto const other = ClosableSPSCMessageQueue::makeQueue("plain", memorySource);
-            REQUIRE_FALSE(other);
-            CHECK_EQ(other.error(), makeErrorCode(Error::TagMismatch));
-        }
     }
 }
 
