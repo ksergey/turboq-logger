@@ -7,6 +7,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <limits>
+#include <optional>
 #include <source_location>
 #include <span>
 #include <string_view>
@@ -56,6 +57,11 @@ concept LogSink = requires(SinkFn& sink, LogMessage const& message, LogCounter c
 };
 
 namespace detail {
+
+/// Parse a queue capacity: bytes as a decimal number, optionally followed by K, M or G (binary:
+/// KiB, MiB, GiB, either case), e.g. "65536", "64K", "4M". std::nullopt if it isn't one, is 0 or
+/// doesn't fit in std::size_t.
+[[nodiscard]] auto parseQueueCapacity(std::string_view text) noexcept -> std::optional<std::size_t>;
 
 /// Hands decoded entries to a Sink: messages with their timestamp as wall-clock time. Counters
 /// aren't part of the Sink interface and are dropped.
@@ -131,8 +137,14 @@ public:
     /// Identifies a flush request, see requestFlush()
     using FlushTicket = std::uint64_t;
 
-    /// Queue size (bytes) until setQueueCapacity() is called
+    /// Queue size (bytes) when neither setQueueCapacity() nor kQueueCapacityVariable sets one
     static constexpr std::size_t kDefaultQueueCapacity = std::size_t{1} << 20;
+
+    /// Environment variable with the queue size, used unless setQueueCapacity() sets one: bytes,
+    /// optionally with a K, M or G suffix (e.g. TURBOQ_LOGGER_QUEUE_CAPACITY=4M). Read once, when the
+    /// registry is first used (the first log call, or the backend starting). An invalid value is
+    /// reported on stderr and kDefaultQueueCapacity is used.
+    static constexpr char const* kQueueCapacityVariable = "TURBOQ_LOGGER_QUEUE_CAPACITY";
 
     BackendBase(BackendBase const&) = delete;
     BackendBase& operator=(BackendBase const&) = delete;
@@ -149,11 +161,13 @@ public:
     }
 
     /// Size (bytes, rounded up to the page size) of queues created from now on, i.e. of threads
-    /// that haven't logged yet; queues already created keep their size. Thread-safe.
+    /// that haven't logged yet; queues already created keep their size. Takes precedence over
+    /// kQueueCapacityVariable, whenever called. Thread-safe.
     /// Throws std::invalid_argument if capacity is 0.
     static void setQueueCapacity(std::size_t capacity);
 
-    /// Size (bytes) queues are created with. Thread-safe.
+    /// Size (bytes) queues are created with: from setQueueCapacity(), else kQueueCapacityVariable,
+    /// else kDefaultQueueCapacity. Thread-safe.
     [[nodiscard]] static auto queueCapacity() -> std::size_t;
 
     /// Ask the backend to flush its sink: on its next poll(Sink&) it reads every entry it can see --

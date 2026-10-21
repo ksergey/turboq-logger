@@ -17,6 +17,8 @@
 #include <thread>
 #include <utility>
 
+#include <turboq/Platform.h>
+
 #include "Backend.h"
 #include "Sink.h"
 
@@ -221,7 +223,7 @@ private:
         s.running.store(false, std::memory_order_release);
     }
 
-    [[gnu::noinline]] static void startAutomatically(State& s) noexcept {
+    TURBOQ_NO_INLINE static void startAutomatically(State& s) noexcept {
         std::lock_guard lock{s.controlMutex};
         if (s.running.load(std::memory_order_relaxed) || !s.autoStart.load(std::memory_order_relaxed)) {
             return; // started (or turned off) by another thread meanwhile

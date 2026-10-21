@@ -253,6 +253,30 @@ TEST_SUITE("Backend") {
         CHECK_EQ(sink.messages.size(), 5);
     }
 
+    TEST_CASE("parsing a queue capacity") {
+        using detail::parseQueueCapacity;
+        CHECK_EQ(parseQueueCapacity("65536"), 65536);
+        CHECK_EQ(parseQueueCapacity("64K"), 64 * 1024);
+        CHECK_EQ(parseQueueCapacity("64k"), 64 * 1024);
+        CHECK_EQ(parseQueueCapacity("4M"), 4 * 1024 * 1024);
+        CHECK_EQ(parseQueueCapacity("1g"), std::size_t{1} << 30);
+
+        // one CHECK per value rather than a loop with CAPTURE: shows the value on failure, and
+        // CAPTURE's polymorphic scope object trips UBSan's vptr check in our -fno-rtti code
+        CHECK_FALSE(parseQueueCapacity(""));
+        CHECK_FALSE(parseQueueCapacity("abc"));
+        CHECK_FALSE(parseQueueCapacity("0"));
+        CHECK_FALSE(parseQueueCapacity("0K"));
+        CHECK_FALSE(parseQueueCapacity("-1"));
+        CHECK_FALSE(parseQueueCapacity(" 64"));
+        CHECK_FALSE(parseQueueCapacity("64 "));
+        CHECK_FALSE(parseQueueCapacity("4X"));
+        CHECK_FALSE(parseQueueCapacity("4KB"));
+        CHECK_FALSE(parseQueueCapacity("4.5M"));
+        CHECK_FALSE(parseQueueCapacity("18446744073709551616"));  // more than std::size_t holds
+        CHECK_FALSE(parseQueueCapacity("17179869184G"));          // fits, but not once multiplied
+    }
+
     TEST_CASE("queue capacity applies to threads that start logging afterwards") {
         auto const previous = Backend::queueCapacity();
         CHECK_EQ(previous, Backend::kDefaultQueueCapacity);

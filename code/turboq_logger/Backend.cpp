@@ -4,6 +4,11 @@
 #include "Backend.h"
 
 #include <atomic>
+#include <charconv>
+#include <cstdio>
+#include <cstdlib>
+#include <limits>
+#include <string_view>
 #include <iterator>
 #include <stdexcept>
 
@@ -16,7 +21,46 @@ std::atomic<bool> backendExists{false};
 std::atomic<std::uint64_t> flushRequestedTicket{0};
 std::atomic<std::uint64_t> flushCompletedTicket{0};
 
+/// Queue capacity from kQueueCapacityVariable, kDefaultQueueCapacity if unset or invalid
+auto initialQueueCapacity() noexcept -> std::size_t {
+    auto const* const value = std::getenv(BackendBase::kQueueCapacityVariable);
+    if (value == nullptr) {
+        return BackendBase::kDefaultQueueCapacity;
+    }
+    if (auto const capacity = detail::parseQueueCapacity(value)) {
+        return *capacity;
+    }
+    std::fprintf(stderr, "turboq-logger: ignoring invalid %s='%s' (expected bytes, e.g. 65536, 64K, 4M)\n",
+        BackendBase::kQueueCapacityVariable, value);
+    return BackendBase::kDefaultQueueCapacity;
+}
+
 } // namespace
+
+auto detail::parseQueueCapacity(std::string_view text) noexcept -> std::optional<std::size_t> {
+    std::size_t value = 0;
+    auto const [end, ec] = std::from_chars(text.data(), text.data() + text.size(), value);
+    if (ec != std::errc{} || end == text.data()) {
+        return std::nullopt;
+    }
+
+    auto const suffix = text.substr(static_cast<std::size_t>(end - text.data()));
+    unsigned shift = 0;
+    if (suffix == "K" || suffix == "k") {
+        shift = 10;
+    } else if (suffix == "M" || suffix == "m") {
+        shift = 20;
+    } else if (suffix == "G" || suffix == "g") {
+        shift = 30;
+    } else if (!suffix.empty()) {
+        return std::nullopt;
+    }
+
+    if (value == 0 || value > (std::numeric_limits<std::size_t>::max() >> shift)) {
+        return std::nullopt;
+    }
+    return value << shift;
+}
 
 BackendBase::BackendBase() {
     if (backendExists.exchange(true, std::memory_order_acq_rel)) {
@@ -29,7 +73,7 @@ BackendBase::~BackendBase() {
 }
 
 auto BackendBase::registry() -> ThreadQueueRegistry& {
-    static ThreadQueueRegistry registry{BoundedSPSCQueue::CreationOptions{.capacityHint = kDefaultQueueCapacity}};
+    static ThreadQueueRegistry registry{BoundedSPSCQueue::CreationOptions{.capacityHint = initialQueueCapacity()}};
     return registry;
 }
 

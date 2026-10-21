@@ -153,6 +153,7 @@ jobs:
               -DCMAKE_VERBOSE_MAKEFILE=ON
               -DCMAKE_BUILD_TYPE=${{ matrix.build_type }}
               -Dturboq_logger_TSC_CLOCK=${{ matrix.tsc_clock }}
+              -Dturboq_logger_BUILD_EXAMPLES=ON
             RESULT_VARIABLE result
           )
           if (NOT result EQUAL 0)

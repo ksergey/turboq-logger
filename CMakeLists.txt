@@ -4,6 +4,7 @@ project(turboq-logger CXX)
 
 option(turboq_logger_TSC_CLOCK "Use TSC clock instead of wall clock" ON)
 option(turboq_logger_BUILD_TESTS "Build tests (*_test.cpp files, linked against doctest)" ON)
+option(turboq_logger_BUILD_EXAMPLES "Build the examples in examples/" OFF)
 
 include(cmake/TurboQLoggerHelpers.cmake)
 include(cmake/GetCPM.cmake)
@@ -17,3 +18,7 @@ if (turboq_logger_BUILD_TESTS)
 endif()
 
 add_subdirectory(code)
+
+if (turboq_logger_BUILD_EXAMPLES)
+    add_subdirectory(examples)
+endif()

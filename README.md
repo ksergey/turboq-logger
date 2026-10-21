@@ -29,6 +29,12 @@ Set `CPM_SOURCE_CACHE` to share downloaded dependencies between build directorie
 |---|---|---|
 | `turboq_logger_TSC_CLOCK` | `ON` | Timestamp log entries with the TSC (`rdtsc`, x86-64 only; needs an invariant TSC) instead of `clock_gettime(CLOCK_REALTIME)`. Defines `TURBOQ_LOGGER_TSC_CLOCK` publicly, so code linking `turboq::logger` sees the same choice. |
 | `turboq_logger_BUILD_TESTS` | `ON` | Build `*_test.cpp` files as doctest executables and register them with `ctest`. |
+| `turboq_logger_BUILD_EXAMPLES` | `OFF` | Build the examples in [`examples/`](examples/) (see [`examples/basic.cpp`](examples/basic.cpp) for a usage example). |
+
+The size of each thread's log queue is 1 MiB by default. Set it in the environment with
+`TURBOQ_LOGGER_QUEUE_CAPACITY` (bytes, optionally with a `K`, `M` or `G` suffix, e.g.
+`TURBOQ_LOGGER_QUEUE_CAPACITY=4M`), or in code with `BackendBase::setQueueCapacity()`, which takes
+precedence. Either applies to threads that haven't logged yet.
 
 ```bash
 cmake -B build -DCMAKE_CXX_COMPILER=g++-14
