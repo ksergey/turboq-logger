@@ -27,7 +27,6 @@ struct TransitEvent {
     Clock::Timestamp timestamp;
     /// Thread identifier
     std::thread::id threadID;
-    // TODO: sequence?
 };
 
 static_assert(std::is_trivially_copyable_v<TransitEvent>);

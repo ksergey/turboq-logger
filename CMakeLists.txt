@@ -16,3 +16,4 @@ if (turboq_logger_BUILD_TESTS)
 endif()
 
 add_subdirectory(code)
+add_subdirectory(example)

@@ -1,5 +1,7 @@
 set(TargetName turboq-logger)
 
+find_package(Threads REQUIRED)
+
 add_library(${TargetName} STATIC)
 target_compile_features(${TargetName}
     PUBLIC cxx_std_23)
@@ -13,7 +15,7 @@ target_compile_options(${TargetName}
 target_include_directories(${TargetName}
     PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 target_link_libraries(${TargetName}
-    PUBLIC turboq::turboq fmt::fmt)
+    PUBLIC Threads::Threads fmt::fmt turboq::turboq)
 
 if (turboq_logger_TSC_CLOCK)
     target_compile_definitions(${TargetName}
