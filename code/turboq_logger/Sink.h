@@ -3,6 +3,7 @@
 
 #pragma once
 
+#include <cstdint>
 #include <ctime>
 #include <source_location>
 #include <string_view>
@@ -31,8 +32,14 @@ public:
         std::thread::id const& threadID, std::string_view message) = 0;
 
     /// Push everything accepted so far out to the medium (e.g. fflush()/fsync() for a file), so it
-    /// survives the process. Called when a flush is requested (see BackendBase::flush()).
+    /// survives the process. Called by BackendThread::flush(), when the sink is replaced and when
+    /// the backend thread stops.
     virtual void flush() = 0;
+
+    /// Some thread's queue was full: count messages it logged were discarded. Called after the
+    /// messages that did fit in that queue. The default writes a LogLevel::Warning message (with no
+    /// thread ID) through write().
+    virtual void dropped(std::uint64_t count);
 };
 
 /// Sink discarding everything

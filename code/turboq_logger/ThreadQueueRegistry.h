@@ -101,7 +101,7 @@ public:
             this->adoptPending();
         }
         fn(std::span<Consumer>{consumers_});
-        // TODO guard with flag?
+        // cheap for live queues: closed() loads the closed flag first and only fetches once it is set
         std::erase_if(consumers_, [](Consumer& consumer) {
             return consumer.closed();
         });

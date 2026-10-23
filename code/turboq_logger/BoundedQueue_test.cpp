@@ -125,6 +125,61 @@ TEST_SUITE("BoundedQueue") {
         CHECK(inOrder);
         CHECK_EQ(expected, kMessageCount);
     }
+
+    TEST_CASE("takeDropped() returns the drops counted since the previous call") {
+        auto queue = makeQueue();
+        auto producer = queue.createProducer();
+        auto consumer = queue.createConsumer();
+
+        CHECK_EQ(consumer.takeDropped(), 0);
+        producer.countDropped();
+        producer.countDropped();
+        producer.countDropped();
+        CHECK_EQ(consumer.takeDropped(), 3);
+        CHECK_EQ(consumer.takeDropped(), 0); // already taken
+
+        producer.countDropped();
+        CHECK_EQ(consumer.takeDropped(), 1);
+    }
+
+    TEST_CASE("a consumer created later doesn't report drops counted before it existed") {
+        auto queue = makeQueue();
+        auto producer = queue.createProducer();
+        producer.countDropped();
+
+        auto consumer = queue.createConsumer();
+        CHECK_EQ(consumer.takeDropped(), 0);
+        producer.countDropped();
+        CHECK_EQ(consumer.takeDropped(), 1);
+    }
+
+    TEST_CASE("drops counted on a full queue reach a consumer on another thread") {
+        auto queue = makeQueue(4096);
+        auto consumer = queue.createConsumer();
+        auto producer = queue.createProducer();
+
+        std::uint64_t enqueued = 0;
+        std::uint64_t dropped = 0;
+        std::thread{[&] {
+            for (std::uint64_t seq = 0; seq < 1000; ++seq) {
+                if (enqueue(producer, Message{.seq = seq})) {
+                    ++enqueued;
+                } else {
+                    producer.countDropped();
+                    ++dropped;
+                }
+            }
+        }}.join();
+        REQUIRE_GT(dropped, 0); // nothing consumed: the 4 KiB queue fills up
+
+        std::uint64_t received = 0;
+        Message msg;
+        while (dequeue(consumer, msg)) {
+            ++received;
+        }
+        CHECK_EQ(received, enqueued);
+        CHECK_EQ(consumer.takeDropped(), dropped);
+    }
 }
 
 } // namespace turboq::logger::testing

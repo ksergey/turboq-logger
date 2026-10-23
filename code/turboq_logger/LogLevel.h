@@ -32,9 +32,8 @@ constexpr auto logLevelToString(LogLevel value) noexcept -> std::string_view {
     case LogLevel::TraceL1: return "tracel1"sv;
     case LogLevel::TraceL2: return "tracel2"sv;
     case LogLevel::TraceL3: return "tracel3"sv;
-    default: break;
     }
-    return "?"sv;
+    return "?"sv; // not a LogLevel enumerator (no default: keeps -Wswitch on new levels)
 }
 
 constexpr auto logLevelFromString(std::string_view value) noexcept -> std::optional<LogLevel> {

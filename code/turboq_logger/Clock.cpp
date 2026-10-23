@@ -3,6 +3,10 @@
 
 #include "Clock.h"
 
+#if defined(TURBOQ_LOGGER_HAS_TSC_CLOCK)
+
+#include <chrono>
+
 #include "detail/TickHelper.h"
 
 namespace turboq::logger {
@@ -14,3 +18,5 @@ auto TSCClock::toTimeSpec(std::int64_t value) noexcept -> ::timespec {
 }
 
 } // namespace turboq::logger
+
+#endif // TURBOQ_LOGGER_HAS_TSC_CLOCK

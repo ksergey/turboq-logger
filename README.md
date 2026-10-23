@@ -27,7 +27,7 @@ Set `CPM_SOURCE_CACHE` to share downloaded dependencies between build directorie
 
 | Option | Default | Effect |
 |---|---|---|
-| `turboq_logger_TSC_CLOCK` | `ON` | Timestamp log entries with the TSC (`rdtsc`, x86-64 only; needs an invariant TSC) instead of `clock_gettime(CLOCK_REALTIME)`. Defines `TURBOQ_LOGGER_TSC_CLOCK` publicly, so code linking `turboq::logger` sees the same choice. |
+| `turboq_logger_TSC_CLOCK` | `ON` on x86-64, `OFF` elsewhere | Timestamp log entries with the TSC (`rdtsc`, x86-64 only; needs an invariant TSC) instead of `clock_gettime(CLOCK_REALTIME)`. Defines `TURBOQ_LOGGER_TSC_CLOCK` publicly, so code linking `turboq::logger` sees the same choice. Turning it on for another architecture is a configure error. |
 | `turboq_logger_BUILD_TESTS` | `ON` | Build `*_test.cpp` files as doctest executables and register them with `ctest`. |
 
 ```bash
@@ -56,6 +56,26 @@ target_link_libraries(your_app PRIVATE turboq::logger)
 ```
 
 `turboq::logger` links `turboq::turboq` publicly, so turboq headers are available to your code as well.
+
+### Usage
+
+```cpp
+#include <turboq_logger/Logging.h>
+
+using namespace turboq::logger;
+
+BackendThread::setSink(std::make_shared<MySink>()); // a turboq::logger::Sink
+
+TURBOQ_LOGGER_LOG_CALL(LogLevel::Info, "order {} filled at {}", orderID, price);
+
+BackendThread::flush(); // wait until this thread's messages are written and the sink flushed
+BackendThread::stop();  // optional: done at exit
+```
+
+- Each thread logs to its own bounded queue. When it is full, the message is dropped and counted;
+  the backend then calls `Sink::dropped(count)`, which by default writes a warning message.
+- An exception thrown by the sink skips that one message: it is reported on stderr (at most once
+  a second) and the backend carries on.
 
 ### License
 

@@ -6,11 +6,12 @@
 #include <algorithm>
 #include <array>
 #include <chrono>
+#include <cstdint>
 #include <ctime>
 #include <ranges>
 
-#if defined(__x86_64__) || defined(_M_X64)
-#include <x86intrin.h>
+#if !defined(__x86_64__)
+#error "TickHelper requires x86-64 (rdtsc)"
 #endif
 
 #include <fmt/format.h>
@@ -50,10 +51,20 @@ public:
         return nanosecondsPerTick_;
     }
 
+    /// TSC ticks between two re-syncs with the wall clock
+    [[nodiscard]] auto resyncIntervalTicks() const noexcept -> std::int64_t {
+        return resyncIntervalTicks_;
+    }
+
+    /// Convert a duration to TSC ticks
+    [[nodiscard]] auto toTicks(std::chrono::nanoseconds duration) const noexcept -> std::int64_t {
+        return static_cast<std::int64_t>(static_cast<double>(duration.count()) / nanosecondsPerTick_);
+    }
+
 private:
     TickHelper(std::chrono::nanoseconds resyncInterval = std::chrono::milliseconds(700)) {
         nanosecondsPerTick_ = calcNsPerTick();
-        resyncIntervalTicks_ = resyncInterval.count() * nanosecondsPerTick_;
+        resyncIntervalTicks_ = toTicks(resyncInterval);
         resyncIntervalOriginal_ = resyncIntervalTicks_;
         if (auto const result = sync(std::chrono::nanoseconds(2500)) || sync(std::chrono::microseconds(10)); !result) {
             fmt::print(stderr, "Failed to sync TSC clock\n");
@@ -62,13 +73,14 @@ private:
 
     auto sync(std::chrono::nanoseconds lag) noexcept -> bool {
         constexpr auto kMaxAttempts = std::size_t(4);
+        auto const lagTicks = toTicks(lag);
 
         for ([[maybe_unused]] auto attempt : std::views::iota(1) | std::views::take(kMaxAttempts)) {
             auto const tscClockStart = tscClockNow();
             auto const wallClockTime = wallClockNow();
             auto const tscClockStop = tscClockNow();
 
-            if (tscClockStop - tscClockStart <= static_cast<std::int64_t>(lag.count())) [[likely]] {
+            if (tscClockStop - tscClockStart <= lagTicks) [[likely]] {
                 wallClockBase_ = wallClockTime;
                 tscClockBase_ = fastAvg(tscClockStart, tscClockStop);
                 resyncIntervalTicks_ = resyncIntervalOriginal_;

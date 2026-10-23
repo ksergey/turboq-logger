@@ -10,14 +10,18 @@ set_target_properties(${TargetName}
         CXX_STANDARD_REQUIRED ON
         CXX_EXTENSIONS OFF
         POSITION_INDEPENDENT_CODE ON)
+# PRIVATE: warnings are for this library's own code, not forced on code linking it
 target_compile_options(${TargetName}
-    PUBLIC -Wall -Wextra -Wattributes -Wpedantic -Wstrict-aliasing -Wcast-align -g -fno-rtti)
+    PRIVATE -Wall -Wextra -Wattributes -Wpedantic -Wstrict-aliasing -Wcast-align)
 target_include_directories(${TargetName}
     PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 target_link_libraries(${TargetName}
     PUBLIC Threads::Threads fmt::fmt turboq::turboq)
 
 if (turboq_logger_TSC_CLOCK)
+    if (NOT CMAKE_SYSTEM_PROCESSOR MATCHES "^(x86_64|AMD64|amd64)$")
+        message(FATAL_ERROR "turboq_logger_TSC_CLOCK requires x86-64 (target: ${CMAKE_SYSTEM_PROCESSOR})")
+    endif()
     target_compile_definitions(${TargetName}
         PUBLIC TURBOQ_LOGGER_TSC_CLOCK)
 endif()
@@ -26,7 +30,6 @@ file(GLOB_RECURSE Sources "${CMAKE_CURRENT_SOURCE_DIR}/turboq_logger/*.cpp")
 file(GLOB_RECURSE Headers "${CMAKE_CURRENT_SOURCE_DIR}/turboq_logger/*.h")
 
 if (turboq_logger_BUILD_TESTS)
-    find_package(Threads REQUIRED)
     TurboQAddTestsFromSourceList(Sources
         PREFIX ${TargetName}
         COMPILE_OPTIONS -Wall -Wextra -g

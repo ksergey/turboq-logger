@@ -50,8 +50,9 @@ TURBOQ_FORCE_INLINE void logTransformedArgsImpl(Args const&... args) {
     auto const size = Codec<TransitEvent>::encodedSize() + Codec<MessageMetadata const*>::encodedSize() +
                       (std::size_t{0} + ... + Codec<Args>::encodedSize(args));
     auto const buffer = producer.prepare(size);
-    if (buffer.empty()) {
-        return; // queue full: this message dropped :(
+    if (buffer.empty()) [[unlikely]] {
+        producer.countDropped(); // queue full: the backend reports it to the sink
+        return;
     }
     auto dest = buffer.data();
     Codec<TransitEvent>::encode(

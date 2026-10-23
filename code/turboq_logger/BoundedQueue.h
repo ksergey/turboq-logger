@@ -7,6 +7,7 @@
 #include <bit>
 #include <cassert>
 #include <cstddef>
+#include <cstdint>
 #include <expected>
 #include <span>
 #include <string_view>
@@ -26,9 +27,12 @@ namespace detail {
 struct BoundedQueueControl {
     // set by the producer's destructor, cleared when a producer is created
     bool closed;
+    // messages the producer couldn't enqueue (queue full); written by the producer only
+    std::uint64_t dropped;
 };
 
 static_assert(std::atomic_ref<bool>::is_always_lock_free);
+static_assert(std::atomic_ref<std::uint64_t>::is_always_lock_free);
 static_assert(std::is_trivially_copyable_v<BoundedQueueControl>);
 
 struct BoundedQueueOptions {
@@ -49,20 +53,17 @@ public:
     BoundedQueueProducer() = default;
 
     ~BoundedQueueProducer() {
-        if (impl_) {
-            // release: pairs with the consumer's acquire load in closed(), so once the consumer
-            // sees closed == true it also sees every message this producer committed
-            std::atomic_ref(this->control().closed).store(true, std::memory_order_release);
-        }
+        this->close();
     }
 
+    /// The moved-from producer is left uninitialized (turboq's producer is), so it won't close the queue
     BoundedQueueProducer(BoundedQueueProducer&&) noexcept = default;
 
     /// Assigning over a live producer destroys it, so its queue is marked closed first
     BoundedQueueProducer& operator=(BoundedQueueProducer&& other) noexcept {
         if (this != &other) {
-            this->~BoundedQueueProducer();
-            new (this) BoundedQueueProducer{std::move(other)};
+            this->close();
+            impl_ = std::move(other.impl_);
         }
         return *this;
     }
@@ -98,21 +99,38 @@ public:
         impl_.commit(size);
     }
 
+    /// Count one message that couldn't be enqueued (see BoundedQueueConsumer::takeDropped())
+    TURBOQ_NO_INLINE void countDropped() noexcept {
+        // single writer: a plain load + store instead of a locked read-modify-write
+        auto dropped = std::atomic_ref(this->control().dropped);
+        dropped.store(dropped.load(std::memory_order_relaxed) + 1, std::memory_order_relaxed);
+    }
+
 private:
     [[nodiscard]] auto control() noexcept -> detail::BoundedQueueControl& {
         return *std::bit_cast<detail::BoundedQueueControl*>(impl_.reserved().data());
+    }
+
+    void close() noexcept {
+        if (impl_) {
+            // release: pairs with the consumer's acquire load in closed(), so once the consumer
+            // sees closed == true it also sees every message this producer committed
+            std::atomic_ref(this->control().closed).store(true, std::memory_order_release);
+        }
     }
 };
 
 class BoundedQueueConsumer {
 private:
     detail::BoundedQueueImpl::Consumer impl_;
+    std::uint64_t droppedSeen_{0};
 
 public:
     BoundedQueueConsumer() = default;
 
     explicit BoundedQueueConsumer(detail::BoundedQueueImpl::Consumer&& impl) noexcept : impl_{std::move(impl)} {
         assert(impl_);
+        droppedSeen_ = std::atomic_ref(this->control().dropped).load(std::memory_order_relaxed);
     }
 
     /// Return true on initialized
@@ -156,6 +174,12 @@ public:
         // observe the producer's final position. fetch() doesn't advance the queue, so calling it
         // here has no effect on the caller's own fetch()/consume() sequence.
         return std::atomic_ref(this->control().closed).load(std::memory_order_acquire) && impl_.fetch().empty();
+    }
+
+    /// Return the number of messages the producer dropped (queue full) since the previous call
+    [[nodiscard]] TURBOQ_FORCE_INLINE auto takeDropped() noexcept -> std::uint64_t {
+        auto const dropped = std::atomic_ref(this->control().dropped).load(std::memory_order_relaxed);
+        return dropped - std::exchange(droppedSeen_, dropped);
     }
 
 private:

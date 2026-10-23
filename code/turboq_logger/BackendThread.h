@@ -8,7 +8,6 @@
 #include <cstddef>
 #include <cstdint>
 #include <exception>
-#include <limits>
 #include <memory>
 #include <mutex>
 #include <optional>
@@ -33,12 +32,11 @@ struct BackendThreadOptions {
 
 namespace detail {
 
-/// Report an error of the backend thread (typically thrown by a sink) on stderr, at most once a
-/// second so a broken sink doesn't flood it
-void reportBackendError(char const* what) noexcept;
-
 /// Name the calling thread "turboq-logger-backend" (best effort)
 void setBackendThreadName() noexcept;
+
+/// True on the backend thread (so in the sink): the calls that wait for that thread check it
+inline thread_local bool isBackendThread = false;
 
 } // namespace detail
 
@@ -58,10 +56,12 @@ void setBackendThreadName() noexcept;
 /// - The thread starts with start(), or by itself on the first log call: the log function calls
 ///   ensureStarted(). Auto start is on by default; setAutoStart(false) turns it off, and so does
 ///   stop(), so late messages during shutdown don't restart the thread.
+/// - flush() waits until everything the calling thread logged has reached the sink, and the sink
+///   has been flushed.
 /// - stop() -- and the end of the program -- reads every message still in the queues (those of
 ///   threads that have exited too), passes them to the sink, flushes it and joins the thread.
 /// - An exception thrown by the sink doesn't stop the thread: it is reported on stderr (at most
-///   once a second) and the thread carries on with the next message.
+///   once a second), the message is skipped and the thread carries on with the next one.
 class BackendThread {
 private:
     struct State {
@@ -79,6 +79,10 @@ private:
         std::atomic<std::uint64_t> sinkVersion{0};
         // the sinkVersion the thread writes to: setSink() waits for it to catch up
         std::atomic<std::uint64_t> appliedSinkVersion{0};
+
+        // flush(): tickets handed out, and the last ticket served (sink flushed after it)
+        std::atomic<std::uint64_t> flushRequested{0};
+        std::atomic<std::uint64_t> flushCompleted{0};
 
         State() {
             // Construct the registry first, so it is destroyed after this state: stopping at exit
@@ -103,23 +107,26 @@ public:
     /// The sink to write messages to, for the whole application; nullptr discards them. Can be
     /// called at any time from any thread. If the thread is running, it flushes the previous sink
     /// and switches, and this waits for that: once it returns, messages go to the new sink. Shared,
-    /// so the previous sink stays alive while the thread finishes with it. Not from the sink (the
-    /// backend thread), which would wait for itself.
+    /// so the previous sink stays alive while the thread finishes with it. From the sink (the
+    /// backend thread) it doesn't wait: the switch happens after the current poll.
     static void setSink(std::shared_ptr<Sink> sink) {
         auto& s = state();
-        // keeps the thread from stopping while we wait for it
-        std::lock_guard controlLock{s.controlMutex};
-        std::uint64_t version = 0;
-        {
+        auto const publish = [&] {
             std::lock_guard lock{s.sinkMutex};
             s.sink = std::move(sink);
-            version = s.sinkVersion.fetch_add(1, std::memory_order_release) + 1;
+            return s.sinkVersion.fetch_add(1, std::memory_order_release) + 1;
+        };
+        if (detail::isBackendThread) {
+            // No waiting, so no controlMutex either: a stop() holding it while joining this
+            // thread would deadlock
+            publish();
+            return;
         }
+        // keeps the thread from stopping while we wait for it
+        std::lock_guard controlLock{s.controlMutex};
+        auto const version = publish();
         if (s.running.load(std::memory_order_relaxed)) {
-            for (auto applied = s.appliedSinkVersion.load(std::memory_order_acquire); applied < version;
-                 applied = s.appliedSinkVersion.load(std::memory_order_acquire)) {
-                s.appliedSinkVersion.wait(applied, std::memory_order_acquire);
-            }
+            waitAtLeast(s.appliedSinkVersion, version);
         }
     }
 
@@ -132,9 +139,12 @@ public:
     }
 
     /// Read every message still in the queues, pass them to the sink, flush it and join the thread.
-    /// Turns auto start off. Does nothing if the thread isn't running. Thread-safe; not from the
-    /// sink (the backend thread).
+    /// Turns auto start off. Does nothing if the thread isn't running. Thread-safe. Throws
+    /// std::logic_error if called from the sink (the backend thread), which can't join itself.
     static void stop() {
+        if (detail::isBackendThread) {
+            throw std::logic_error{"turboq::logger backend thread can't be stopped from its sink"};
+        }
         auto& s = state();
         std::lock_guard lock{s.controlMutex};
         stopLocked(s);
@@ -164,26 +174,41 @@ public:
         return state().running.load(std::memory_order_acquire);
     }
 
-    /// Wait until everything the calling thread logged before has been written and the sink
-    /// flushed. Returns right away if the thread isn't running; a stop() meanwhile releases it.
-    /// Not from the sink (the backend thread), which would wait for itself.
-    static void flush() noexcept {
-#if 0
+    /// Wait until everything the calling thread logged before has been passed to the sink and the
+    /// sink flushed. Returns right away if the thread isn't running, or if called from the sink
+    /// (the backend thread), which would wait for itself; a stop() meanwhile releases it.
+    static void flush() {
+        if (detail::isBackendThread) {
+            return;
+        }
         auto& s = state();
-        BackendBase::FlushTicket ticket = 0;
+        std::uint64_t ticket = 0;
         {
             // checked and requested together: a stop() can't slip in between and miss the request
             std::lock_guard lock{s.controlMutex};
             if (!s.running.load(std::memory_order_relaxed)) {
                 return;
             }
-            ticket = BackendBase::requestFlush();
+            // release: the thread's acquire load of the ticket makes this thread's earlier commits
+            // visible to the poll that follows it
+            ticket = s.flushRequested.fetch_add(1, std::memory_order_acq_rel) + 1;
         }
-        BackendBase::waitFlushed(ticket);
-#endif
+        waitAtLeast(s.flushCompleted, ticket);
     }
 
 private:
+    static void waitAtLeast(std::atomic<std::uint64_t>& counter, std::uint64_t value) noexcept {
+        for (auto current = counter.load(std::memory_order_acquire); current < value;
+             current = counter.load(std::memory_order_acquire)) {
+            counter.wait(current, std::memory_order_acquire);
+        }
+    }
+
+    static void completeFlush(State& s, std::uint64_t ticket) noexcept {
+        s.flushCompleted.store(ticket, std::memory_order_release);
+        s.flushCompleted.notify_all();
+    }
+
     static void startLocked(State& s, BackendThreadOptions const& options) {
         if (s.running.load(std::memory_order_relaxed)) {
             throw std::logic_error{"turboq::logger backend thread is already running"};
@@ -208,10 +233,8 @@ private:
         s.thread.request_stop();
         s.thread.join();
         s.backend.reset();
-#if 0
-        // Nothing will flush from now on: release everyone waiting for a flush
-        BackendBase::completeFlush(BackendBase::flushRequested());
-#endif
+        // The thread has drained and flushed: that serves every flush requested so far
+        completeFlush(s, s.flushRequested.load(std::memory_order_acquire));
         s.running.store(false, std::memory_order_release);
     }
 
@@ -222,17 +245,15 @@ private:
         }
         try {
             startLocked(s, s.autoStartOptions);
-        } catch (std::exception const& e) {
-            s.autoStart.store(false, std::memory_order_relaxed);
-            detail::reportBackendError(e.what());
         } catch (...) {
             s.autoStart.store(false, std::memory_order_relaxed);
-            detail::reportBackendError("unknown error starting the backend thread");
+            detail::reportBackendError(std::current_exception());
         }
     }
 
     /// The backend thread
     static void run(std::stop_token const& stop, State& s, BackendThreadOptions const& options) {
+        detail::isBackendThread = true;
         detail::setBackendThreadName();
         auto& backend = *s.backend;
 
@@ -240,18 +261,18 @@ private:
         std::shared_ptr<Sink> sink;
         std::uint64_t sinkVersion = 0;
         bool haveSink = false;
+        std::uint64_t flushServed = s.flushCompleted.load(std::memory_order_relaxed);
 
         auto const guarded = [](auto&& fn) -> std::size_t {
             try {
                 return fn();
-            } catch (std::exception const& e) {
-                detail::reportBackendError(e.what());
             } catch (...) {
-                detail::reportBackendError("unknown error in the logger sink");
+                detail::reportBackendError(std::current_exception());
             }
             return 0;
         };
-        struct EventSink {
+        // Backend events -> Sink calls
+        struct SinkAdapter {
             Sink* sink;
 
             void operator()(LogMessageEvent const& event) {
@@ -259,13 +280,18 @@ private:
                     event.location, event.level, Clock::toTimeSpec(event.timestamp), event.threadID, event.message);
             }
             void operator()([[maybe_unused]] LogValueEvent const& event) {}
-
-            void flush() {
-                sink->flush();
+            void operator()(DroppedMessagesEvent const& event) {
+                sink->dropped(event.count);
             }
         };
-        auto const currentSink = [&]() -> EventSink {
-            return EventSink{sink ? sink.get() : &nullSink};
+        auto const currentSink = [&]() -> Sink& {
+            return sink ? *sink : nullSink;
+        };
+        auto const flushSink = [&] {
+            guarded([&] {
+                currentSink().flush();
+                return std::size_t{0};
+            });
         };
         auto const refreshSink = [&] {
             if (haveSink && s.sinkVersion.load(std::memory_order_acquire) == sinkVersion) [[likely]] {
@@ -278,10 +304,7 @@ private:
                 sinkVersion = s.sinkVersion.load(std::memory_order_relaxed);
             }
             if (haveSink && next != sink) {
-                guarded([&] {
-                    currentSink().flush(); // the previous sink gets everything it has accepted out
-                    return std::size_t{0};
-                });
+                flushSink(); // the previous sink gets everything it has accepted out
             }
             sink = std::move(next);
             haveSink = true;
@@ -289,27 +312,32 @@ private:
             s.appliedSinkVersion.notify_all();
         };
         auto const pollOnce = [&] {
+            // Backend::poll() handles errors per entry; this only catches what is left (e.g. out of
+            // memory adopting a new queue)
             return guarded([&] {
-                return backend.poll(currentSink());
+                return backend.poll(SinkAdapter{&currentSink()});
             });
         };
 
         while (!stop.stop_requested()) {
             refreshSink();
-            if (pollOnce() == 0) {
+            // read before polling: the poll then sees everything logged before the request
+            auto const flushTicket = s.flushRequested.load(std::memory_order_acquire);
+            auto const processed = pollOnce();
+            if (flushTicket != flushServed) {
+                flushSink();
+                flushServed = flushTicket;
+                completeFlush(s, flushTicket);
+            } else if (processed == 0) {
                 std::this_thread::sleep_for(options.idleSleep);
             }
         }
 
-        // Stopping: read everything still in the queues, then flush
+        // Stopping: read everything still in the queues, then flush (stopLocked() then serves the
+        // pending flush requests)
         refreshSink();
-
         while (pollOnce() != 0) {}
-
-        guarded([&] {
-            currentSink().flush();
-            return std::size_t{0};
-        });
+        flushSink();
     }
 };
 

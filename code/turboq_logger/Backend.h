@@ -4,6 +4,8 @@
 #pragma once
 
 #include <cassert>
+#include <cstdint>
+#include <exception>
 #include <limits>
 #include <source_location>
 #include <stdexcept>
@@ -39,11 +41,29 @@ struct LogValueEvent {
     double value;
 };
 
+/// A queue was full: count messages logged to it were discarded
+struct DroppedMessagesEvent {
+    std::uint64_t count;
+};
+
 template <typename SinkFn>
-concept EventSink = requires(SinkFn& sink, LogMessageEvent const& logMessageEvent, LogValueEvent& logValueEvent) {
+concept EventSink = requires(SinkFn& sink, LogMessageEvent const& logMessageEvent, LogValueEvent const& logValueEvent,
+    DroppedMessagesEvent const& droppedMessagesEvent) {
     sink(logMessageEvent);
     sink(logValueEvent);
+    sink(droppedMessagesEvent);
 };
+
+namespace detail {
+
+/// Report an error of the backend (typically thrown by a sink) on stderr, at most once a second so
+/// a broken sink doesn't flood it
+void reportBackendError(char const* what) noexcept;
+
+/// \overload
+void reportBackendError(std::exception_ptr const& error) noexcept;
+
+} // namespace detail
 
 class Backend final {
 private:
@@ -78,7 +98,12 @@ public:
     /// \throw std::invalid_argument if capacity is 0.
     static void setQueueCapacity(std::size_t capacity);
 
-    /// Read the queues of all threads, decode their entries and pass each to sink
+    /// Read the queues of all threads, decode their entries and pass each to sink, then report
+    /// messages dropped since the previous poll. Return the number of entries read.
+    ///
+    /// An exception thrown while handling an entry (by the sink, or out of memory formatting it) is
+    /// reported on stderr (see detail::reportBackendError()) and the entry is skipped: one bad
+    /// entry never blocks the entries after it.
     template <typename Sink>
         requires EventSink<Sink>
     auto poll(Sink&& sink) -> std::size_t {
@@ -90,9 +115,20 @@ public:
                 if (buffer.empty()) {
                     break;
                 }
-                processBuffer(buffer, sink);
-                consumer.consume();
+                try {
+                    processBuffer(buffer, sink);
+                } catch (...) {
+                    detail::reportBackendError(std::current_exception());
+                }
+                consumer.consume(); // even on error: retrying the entry would fail again
                 ++processedCount;
+            }
+            if (auto const dropped = consumer.takeDropped(); dropped != 0) [[unlikely]] {
+                try {
+                    sink(DroppedMessagesEvent{.count = dropped});
+                } catch (...) {
+                    detail::reportBackendError(std::current_exception());
+                }
             }
         });
 
@@ -130,10 +166,8 @@ private:
                 .value = value,
             });
         } break;
-        default: {
-            assert(false && "unknown transit event type");
-        } break;
         }
+        // no default: keeps -Wswitch on new event types. Producers only write known types.
     }
 };
 

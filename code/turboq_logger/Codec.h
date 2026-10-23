@@ -1,11 +1,14 @@
 // Copyright (c) Sergey Kovalevich <inndie@gmail.com>
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: MIT
 
 #pragma once
 
+#include <algorithm>
+#include <bit>
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
+#include <limits>
 #include <string>
 #include <string_view>
 #include <tuple>
@@ -16,7 +19,7 @@ namespace turboq::logger {
 /// Codec for encoding/decoding a type T
 template <typename T>
 struct Codec {
-    static_assert(false, "Packing type T is not implemeted");
+    static_assert(false, "Packing type T is not implemented");
 
     /// Return number of bytes required for encoding value of type T
     /// @param[in] value is value for encoding
@@ -58,18 +61,30 @@ struct Codec<T> {
     }
 };
 
+/// Strings longer than kMaxSize bytes are truncated to their first kMaxSize bytes
 template <>
 struct Codec<std::string_view> {
-    using SizeCodec = Codec<std::uint32_t>;
+    using SizeType = std::uint32_t;
+    using SizeCodec = Codec<SizeType>;
+
+    static constexpr std::size_t kMaxSize = std::numeric_limits<SizeType>::max();
+
+    /// Number of bytes of value that get encoded
+    static constexpr auto encodedLength(std::string_view const& value) noexcept -> SizeType {
+        return static_cast<SizeType>(std::min(value.size(), kMaxSize));
+    }
 
     static constexpr auto encodedSize(std::string_view const& value) noexcept -> std::size_t {
-        return SizeCodec::encodedSize(value.size()) + value.size();
+        return SizeCodec::encodedSize() + encodedLength(value);
     }
 
     static void encode(std::byte*& dest, std::string_view const& value) noexcept {
-        SizeCodec::encode(dest, value.size());
-        std::memcpy(dest, value.data(), value.size());
-        dest += value.size();
+        auto const size = encodedLength(value);
+        SizeCodec::encode(dest, size);
+        if (size != 0) [[likely]] {
+            std::memcpy(dest, value.data(), size); // a default string_view has data() == nullptr
+        }
+        dest += size;
     }
 
     static auto decode(std::byte const*& src) noexcept -> std::string_view {
