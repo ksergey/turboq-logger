@@ -25,7 +25,9 @@ int main(int argc, char* argv[]) {
         if (mode == "file") {
             BackendThread::setSink(std::make_shared<FileSink>(argv[2]));
         } else if (mode == "daily") {
-            BackendThread::setSink(std::make_shared<DailyFileSink>(argv[2]));
+            // a pattern of our own, checked at compile time
+            BackendThread::setSink(std::make_shared<DailyFileSink>(
+                argv[2], makeFormatter<"{time:%T}.{us:06} {level:<7} {file}:{line} {message}">()));
         } else {
             BackendThread::setSink(std::make_shared<StdOutSink>());
         }

@@ -6,10 +6,11 @@
 #include <cstddef>
 #include <ctime>
 #include <filesystem>
+#include <memory>
 
 #include <fmt/format.h>
 
-#include "LineFormatter.h"
+#include "Formatter.h"
 #include "Sink.h"
 #include "detail/LogFile.h"
 
@@ -24,7 +25,7 @@ struct DailyFileSinkOptions {
 };
 
 /// Writes messages to the file "<prefix>_YYYYMMDD.log" of the day they were logged on, one line
-/// each (see LineFormatter); a new file starts at local midnight.
+/// each (see Formatter); a new file starts at local midnight.
 ///
 ///     BackendThread::setSink(std::make_shared<DailyFileSink>("logs/app")); // logs/app_20261023.log
 ///
@@ -35,11 +36,12 @@ struct DailyFileSinkOptions {
 ///   next one by the first message of the next day: a day without messages has no file.
 /// - Files are opened for appending: a restart the same day continues today's file. Missing
 ///   parent directories are created.
+/// - ColorMode::Auto means no colors.
 class DailyFileSink final : public Sink {
 private:
     std::filesystem::path prefix_;
     DailyFileSinkOptions options_;
-    LineFormatter formatter_;
+    std::unique_ptr<FormatterBase> formatter_;
     fmt::memory_buffer line_;
 
     detail::LogFile file_;
@@ -47,9 +49,10 @@ private:
     std::time_t nextDayStart_{0};
 
 public:
-    /// Open today's file. Throws std::system_error (or std::filesystem::filesystem_error) if it
-    /// can't be opened.
-    explicit DailyFileSink(std::filesystem::path prefix, DailyFileSinkOptions const& options = {});
+    /// Open today's file. formatter nullptr: DefaultFormatter. Throws std::system_error (or
+    /// std::filesystem::filesystem_error) if the file can't be opened.
+    explicit DailyFileSink(std::filesystem::path prefix, std::unique_ptr<FormatterBase> formatter = nullptr,
+        DailyFileSinkOptions const& options = {});
 
     ~DailyFileSink() override;
 
@@ -67,6 +70,10 @@ public:
     /// The file being written
     [[nodiscard]] auto path() const noexcept -> std::filesystem::path const& {
         return file_.path();
+    }
+
+    [[nodiscard]] auto formatter() const noexcept -> FormatterBase const& {
+        return *formatter_;
     }
 
     /// The file for the day containing time: "<prefix>_YYYYMMDD.log" (local time)

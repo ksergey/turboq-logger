@@ -230,9 +230,21 @@ TEST_SUITE("DailyFileSink") {
         CHECK_EQ(messagesIn(prefix.string() + "_20301028.log"), std::vector<std::string>{"after autumn"});
     }
 
+    TEST_CASE("a custom formatter; Auto colors mean none") {
+        TempDir dir;
+        DailyFileSink sink{dir.path() / "app", makeFormatter<"{time:%F}|{level}|{message}">()};
+        CHECK_FALSE(sink.formatter().colorsEnabled());
+        log(sink, localTime(2030, 5, 6), "custom");
+        sink.flush();
+        std::ifstream file{sink.path()};
+        std::string line;
+        std::getline(file, line);
+        CHECK_EQ(line, "2030-05-06|info|custom");
+    }
+
     TEST_CASE("fsyncOnFlush") {
         TempDir dir;
-        DailyFileSink sink{dir.path() / "app", DailyFileSinkOptions{.bufferSize = 512, .fsyncOnFlush = true}};
+        DailyFileSink sink{dir.path() / "app", {}, DailyFileSinkOptions{.bufferSize = 512, .fsyncOnFlush = true}};
         log(sink, std::time(nullptr), "synced");
         CHECK_NOTHROW(sink.flush());
         CHECK_EQ(messagesIn(sink.path()), std::vector<std::string>{"synced"});
@@ -240,7 +252,7 @@ TEST_SUITE("DailyFileSink") {
 
     TEST_CASE("a small buffer: lines longer than it are written whole") {
         TempDir dir;
-        DailyFileSink sink{dir.path() / "app", DailyFileSinkOptions{.bufferSize = 16}};
+        DailyFileSink sink{dir.path() / "app", {}, DailyFileSinkOptions{.bufferSize = 16}};
         std::string const longMessage(1000, 'x');
         log(sink, std::time(nullptr), longMessage);
         log(sink, std::time(nullptr), "short");

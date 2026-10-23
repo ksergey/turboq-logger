@@ -5,10 +5,11 @@
 
 #include <cstddef>
 #include <filesystem>
+#include <memory>
 
 #include <fmt/format.h>
 
-#include "LineFormatter.h"
+#include "Formatter.h"
 #include "Sink.h"
 #include "detail/LogFile.h"
 
@@ -24,24 +25,25 @@ struct FileSinkOptions {
     bool truncate = false;
 };
 
-/// Writes messages to one file, one line each (see LineFormatter).
+/// Writes messages to one file, one line each (see FormatterBase, Formatter).
 ///
 ///     BackendThread::setSink(std::make_shared<FileSink>("logs/app.log"));
 ///
 /// The file is opened on construction (so a bad path fails right away), for appending unless
-/// FileSinkOptions::truncate. Missing parent directories are created. For a new file every day,
-/// see DailyFileSink.
+/// FileSinkOptions::truncate. Missing parent directories are created. ColorMode::Auto means no
+/// colors. For a new file every day, see DailyFileSink.
 class FileSink final : public Sink {
 private:
     detail::LogFile file_;
     bool fsyncOnFlush_;
-    LineFormatter formatter_;
+    std::unique_ptr<FormatterBase> formatter_;
     fmt::memory_buffer line_;
 
 public:
-    /// Open the file. Throws std::system_error (or std::filesystem::filesystem_error) if it can't
-    /// be opened.
-    explicit FileSink(std::filesystem::path path, FileSinkOptions const& options = {});
+    /// Open the file. formatter nullptr: DefaultFormatter. Throws std::system_error (or
+    /// std::filesystem::filesystem_error) if the file can't be opened.
+    explicit FileSink(std::filesystem::path path, std::unique_ptr<FormatterBase> formatter = nullptr,
+        FileSinkOptions const& options = {});
 
     FileSink(FileSink const&) = delete;
     FileSink& operator=(FileSink const&) = delete;
@@ -56,6 +58,10 @@ public:
     /// The file being written
     [[nodiscard]] auto path() const noexcept -> std::filesystem::path const& {
         return file_.path();
+    }
+
+    [[nodiscard]] auto formatter() const noexcept -> FormatterBase const& {
+        return *formatter_;
     }
 };
 

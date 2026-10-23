@@ -85,14 +85,14 @@ TEST_SUITE("FileSink") {
         CHECK_EQ(fs::file_size(path), 0);
     }
 
-    TEST_CASE("messages are written as LineFormatter lines, visible after flush()") {
+    TEST_CASE("messages are written as DefaultFormatter lines, visible after flush()") {
         TempDir dir;
         FileSink sink{dir.path() / "app.log"};
         log(sink, "first", LogLevel::Warning);
         log(sink, "second");
         sink.flush();
 
-        LineFormatter formatter;
+        DefaultFormatter formatter;
         fmt::memory_buffer expected;
         ::timespec const ts{.tv_sec = 1792751045, .tv_nsec = 7};
         formatter.format(expected, kLocation, LogLevel::Warning, ts, std::this_thread::get_id(), "first");
@@ -132,7 +132,7 @@ TEST_SUITE("FileSink") {
             log(sink, "old");
         }
         {
-            FileSink sink{path, FileSinkOptions{.truncate = true}};
+            FileSink sink{path, {}, FileSinkOptions{.truncate = true}};
             CHECK_EQ(fs::file_size(path), 0);
             log(sink, "new");
         }
@@ -150,7 +150,7 @@ TEST_SUITE("FileSink") {
 
     TEST_CASE("a small buffer: lines longer than it are written whole") {
         TempDir dir;
-        FileSink sink{dir.path() / "app.log", FileSinkOptions{.bufferSize = 16}};
+        FileSink sink{dir.path() / "app.log", {}, FileSinkOptions{.bufferSize = 16}};
         std::string const longMessage(1000, 'x');
         log(sink, longMessage);
         log(sink, "short");
@@ -160,10 +160,33 @@ TEST_SUITE("FileSink") {
 
     TEST_CASE("fsyncOnFlush") {
         TempDir dir;
-        FileSink sink{dir.path() / "app.log", FileSinkOptions{.fsyncOnFlush = true}};
+        FileSink sink{dir.path() / "app.log", {}, FileSinkOptions{.fsyncOnFlush = true}};
         log(sink, "synced");
         CHECK_NOTHROW(sink.flush());
         CHECK_EQ(messagesIn(sink.path()), std::vector<std::string>{"synced"});
+    }
+
+    TEST_CASE("a custom formatter") {
+        TempDir dir;
+        {
+            FileSink sink{dir.path() / "app.log", makeFormatter<"{level}|{file}|{message}">()};
+            log(sink, "custom", LogLevel::Notice);
+        }
+        CHECK_EQ(readFile(dir.path() / "app.log"), "notice|FileSink_test.cpp|custom\n");
+    }
+
+    TEST_CASE("colors: Auto means none in a file, Always writes them") {
+        TempDir dir;
+        {
+            FileSink automatic{dir.path() / "auto.log", makeFormatter<"{level}">()};
+            CHECK_FALSE(automatic.formatter().colorsEnabled());
+            log(automatic, "", LogLevel::Error);
+
+            FileSink always{dir.path() / "always.log", makeFormatter<"{level}">({.colors = ColorMode::Always})};
+            log(always, "", LogLevel::Error);
+        }
+        CHECK_EQ(readFile(dir.path() / "auto.log"), "error\n");
+        CHECK_EQ(readFile(dir.path() / "always.log"), fmt::format(kDefaultLevelStyles[0], "error") + "\n");
     }
 
     TEST_CASE("end to end: tq_* calls from several threads through the backend thread") {
@@ -172,7 +195,7 @@ TEST_SUITE("FileSink") {
 
         TempDir dir;
         auto const path = dir.path() / "app.log";
-        BackendThread::setSink(std::make_shared<FileSink>(path, FileSinkOptions{.truncate = true}));
+        BackendThread::setSink(std::make_shared<FileSink>(path, nullptr, FileSinkOptions{.truncate = true}));
         BackendThread::start();
         {
             std::vector<std::jthread> threads;
