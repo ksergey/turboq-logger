@@ -21,7 +21,6 @@ struct CollectingSink {
         messages.emplace_back(event.message);
     }
     void operator()(LogValueEvent const&) {}
-    void operator()(DroppedMessagesEvent const&) {}
 };
 
 /// Everything logged so far by any thread, in order per thread
