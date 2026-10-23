@@ -3,6 +3,7 @@
 
 #pragma once
 
+#include <atomic>
 #include <cstdint>
 #include <optional>
 #include <string_view>
@@ -57,6 +58,24 @@ constexpr auto logLevelFromString(std::string_view value) noexcept -> std::optio
         return LogLevel::TraceL3;
     }
     return std::nullopt;
+}
+
+namespace detail {
+
+inline std::atomic<LogLevel> logLevel{LogLevel::TraceL3};
+
+static_assert(std::atomic<LogLevel>::is_always_lock_free);
+
+} // namespace detail
+
+/// Return the log level (default: LogLevel::TraceL3). Thread-safe.
+[[nodiscard]] inline auto logLevel() noexcept -> LogLevel {
+    return detail::logLevel.load(std::memory_order_relaxed);
+}
+
+/// Set the log level. Thread-safe.
+inline void setLogLevel(LogLevel level) noexcept {
+    detail::logLevel.store(level, std::memory_order_relaxed);
 }
 
 } // namespace turboq::logger

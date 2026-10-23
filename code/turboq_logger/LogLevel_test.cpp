@@ -4,6 +4,7 @@
 #include "LogLevel.h"
 
 #include <array>
+#include <thread>
 
 #include <doctest/doctest.h>
 
@@ -36,6 +37,28 @@ TEST_SUITE("LogLevel") {
 
     TEST_CASE("a value outside the enum prints as '?'") {
         CHECK_EQ(logLevelToString(static_cast<LogLevel>(200)), "?");
+    }
+
+    TEST_CASE("log level: TraceL3 by default, set value is read back") {
+        auto const previous = logLevel();
+        CHECK_EQ(previous, LogLevel::TraceL3);
+
+        for (auto const level : kAllLevels) {
+            setLogLevel(level);
+            CHECK_EQ(logLevel(), level);
+        }
+        setLogLevel(previous);
+    }
+
+    TEST_CASE("log level is process-wide: set on one thread, read on another") {
+        auto const previous = logLevel();
+        setLogLevel(LogLevel::Warning);
+        auto seen = LogLevel::TraceL3;
+        std::thread{[&] {
+            seen = logLevel();
+        }}.join();
+        CHECK_EQ(seen, LogLevel::Warning);
+        setLogLevel(previous);
     }
 }
 

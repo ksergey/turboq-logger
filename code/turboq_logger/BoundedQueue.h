@@ -8,6 +8,7 @@
 #include <cassert>
 #include <cstddef>
 #include <cstdint>
+#include <cstdio>
 #include <expected>
 #include <span>
 #include <string_view>
@@ -99,7 +100,7 @@ public:
         impl_.commit(size);
     }
 
-    /// Count one message that couldn't be enqueued (see BoundedQueueConsumer::takeDropped())
+    /// Count one message that couldn't be enqueued (see BoundedQueueConsumer::dropped())
     TURBOQ_NO_INLINE void countDropped() noexcept {
         // single writer: a plain load + store instead of a locked read-modify-write
         auto dropped = std::atomic_ref(this->control().dropped);
@@ -126,6 +127,23 @@ private:
 
 public:
     BoundedQueueConsumer() = default;
+
+    /// Prints the number of messages the producer dropped to stderr, if any
+    ~BoundedQueueConsumer() {
+        this->reportDropped();
+    }
+
+    /// The moved-from consumer is left uninitialized (turboq's consumer is), so it won't report
+    BoundedQueueConsumer(BoundedQueueConsumer&&) noexcept = default;
+
+    /// Assigning over a live consumer destroys it, so its drops are reported first
+    BoundedQueueConsumer& operator=(BoundedQueueConsumer&& other) noexcept {
+        if (this != &other) {
+            this->reportDropped();
+            impl_ = std::move(other.impl_);
+        }
+        return *this;
+    }
 
     explicit BoundedQueueConsumer(detail::BoundedQueueImpl::Consumer&& impl) noexcept : impl_{std::move(impl)} {
         assert(impl_);
@@ -182,6 +200,16 @@ public:
 private:
     [[nodiscard]] auto control() noexcept -> detail::BoundedQueueControl& {
         return *std::bit_cast<detail::BoundedQueueControl*>(impl_.reserved().data());
+    }
+
+    void reportDropped() noexcept {
+        if (!impl_) {
+            return;
+        }
+        if (auto const count = this->dropped(); count > 0) [[unlikely]] {
+            std::fprintf(stderr, "turboq-logger: %zu message(s) dropped, queue full (capacity %zu bytes)\n", count,
+                this->capacity());
+        }
     }
 };
 

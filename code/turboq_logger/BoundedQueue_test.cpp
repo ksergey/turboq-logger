@@ -4,7 +4,9 @@
 #include "BoundedQueue.h"
 
 #include <cstdint>
+#include <cstdio>
 #include <optional>
+#include <string>
 #include <thread>
 
 #include <unistd.h>
@@ -17,6 +19,34 @@ namespace turboq::logger::testing {
 
 using ::turboq::testing::dequeue;
 using ::turboq::testing::enqueue;
+
+namespace {
+
+/// Return what fn() writes to stderr
+template <typename Fn>
+auto captureStderr(Fn&& fn) -> std::string {
+    std::fflush(stderr);
+    auto* const file = std::tmpfile();
+    REQUIRE(file != nullptr);
+    auto const saved = ::dup(STDERR_FILENO);
+    ::dup2(::fileno(file), STDERR_FILENO);
+
+    fn();
+
+    std::fflush(stderr);
+    ::dup2(saved, STDERR_FILENO);
+    ::close(saved);
+
+    std::string output;
+    std::rewind(file);
+    for (int c = std::fgetc(file); c != EOF; c = std::fgetc(file)) {
+        output.push_back(static_cast<char>(c));
+    }
+    std::fclose(file);
+    return output;
+}
+
+} // namespace
 
 TEST_SUITE("BoundedQueue") {
 
@@ -168,6 +198,67 @@ TEST_SUITE("BoundedQueue") {
         }
         CHECK_EQ(received, enqueued);
         CHECK_EQ(consumer.dropped(), dropped);
+    }
+
+    TEST_CASE("a consumer destroyed with drops prints their count to stderr") {
+        auto queue = makeQueue(4096);
+        auto producer = queue.createProducer();
+        std::optional<BoundedQueue::Consumer> consumer{queue.createConsumer()};
+        producer.countDropped();
+        producer.countDropped();
+
+        auto const output = captureStderr([&] {
+            consumer.reset();
+        });
+        CHECK_EQ(output, "turboq-logger: 2 message(s) dropped, queue full (capacity 4096 bytes)\n");
+    }
+
+    TEST_CASE("a consumer destroyed without drops prints nothing") {
+        auto queue = makeQueue();
+        auto producer = queue.createProducer();
+        std::optional<BoundedQueue::Consumer> consumer{queue.createConsumer()};
+
+        CHECK_EQ(captureStderr([&] {
+            consumer.reset();
+        }),
+            "");
+        CHECK_EQ(captureStderr([] {
+            BoundedQueue::Consumer{}; // uninitialized
+        }),
+            "");
+    }
+
+    TEST_CASE("drops are printed once: a moved-from consumer prints nothing") {
+        auto queue = makeQueue(4096);
+        auto producer = queue.createProducer();
+        producer.countDropped();
+
+        std::optional<BoundedQueue::Consumer> holder{queue.createConsumer()};
+        std::optional<BoundedQueue::Consumer> consumer;
+        CHECK_EQ(captureStderr([&] {
+            consumer.emplace(std::move(*holder));
+            holder.reset(); // moved-from
+        }),
+            "");
+        CHECK_EQ(captureStderr([&] {
+            consumer.reset();
+        }),
+            "turboq-logger: 1 message(s) dropped, queue full (capacity 4096 bytes)\n");
+    }
+
+    TEST_CASE("assigning over a live consumer prints the drops of the one it replaces") {
+        auto first = makeQueue(4096);
+        auto firstProducer = first.createProducer();
+        auto consumer = first.createConsumer();
+        firstProducer.countDropped();
+
+        auto second = makeQueue(8192);
+        auto secondProducer = second.createProducer();
+        CHECK_EQ(captureStderr([&] {
+            consumer = second.createConsumer();
+        }),
+            "turboq-logger: 1 message(s) dropped, queue full (capacity 4096 bytes)\n");
+        CHECK_EQ(consumer.dropped(), 0); // now the second queue's
     }
 }
 

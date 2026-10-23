@@ -73,7 +73,7 @@ BackendThread::stop();  // optional: done at exit
 ```
 
 - Each thread logs to its own bounded queue. When it is full, the message is dropped and counted;
-  the backend then calls `Sink::dropped(count)`, which by default writes a warning message.
+  the count is printed to stderr when the queue is destroyed.
 - An exception thrown by the sink skips that one message: it is reported on stderr (at most once
   a second) and the backend carries on.
 

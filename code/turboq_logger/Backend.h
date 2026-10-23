@@ -91,8 +91,8 @@ public:
     /// \throw std::invalid_argument if capacity is 0.
     static void setQueueCapacity(std::size_t capacity);
 
-    /// Read the queues of all threads, decode their entries and pass each to sink, then report
-    /// messages dropped since the previous poll. Return the number of entries read.
+    /// Read the queues of all threads, decode their entries and pass each to sink. Return the
+    /// number of entries read.
     ///
     /// An exception thrown while handling an entry (by the sink, or out of memory formatting it) is
     /// reported on stderr (see detail::reportBackendError()) and the entry is skipped: one bad
