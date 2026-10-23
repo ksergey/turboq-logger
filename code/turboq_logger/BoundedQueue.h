@@ -100,6 +100,11 @@ public:
         impl_.commit(size);
     }
 
+    /// Return the number of messages counted by countDropped()
+    [[nodiscard]] TURBOQ_FORCE_INLINE auto dropped() noexcept -> std::size_t {
+        return std::atomic_ref(this->control().dropped).load(std::memory_order_relaxed);
+    }
+
     /// Count one message that couldn't be enqueued (see BoundedQueueConsumer::dropped())
     TURBOQ_NO_INLINE void countDropped() noexcept {
         // single writer: a plain load + store instead of a locked read-modify-write

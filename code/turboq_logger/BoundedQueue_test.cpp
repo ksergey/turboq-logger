@@ -170,6 +170,7 @@ TEST_SUITE("BoundedQueue") {
 
         producer.countDropped();
         CHECK_EQ(consumer.dropped(), 4);
+        CHECK_EQ(producer.dropped(), 4); // the producer sees its own count too
     }
 
     TEST_CASE("drops counted on a full queue reach a consumer on another thread") {

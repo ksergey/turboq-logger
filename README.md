@@ -20,6 +20,8 @@ Everything else is fetched automatically at configure time via [CPM.cmake](https
 - [fmt](https://github.com/fmtlib/fmt) -- formatting
 - [doctest](https://github.com/doctest/doctest) -- unit tests (`code/turboq_logger/*_test.cpp`); skipped when
   `-Dturboq_logger_BUILD_TESTS=OFF`
+- [Google Benchmark](https://github.com/google/benchmark) -- benchmarks (`code/turboq_logger/*_bm.cpp`); skipped
+  when `-Dturboq_logger_BUILD_BENCHMARKS=OFF`
 
 Set `CPM_SOURCE_CACHE` to share downloaded dependencies between build directories and projects.
 
@@ -29,6 +31,9 @@ Set `CPM_SOURCE_CACHE` to share downloaded dependencies between build directorie
 |---|---|---|
 | `turboq_logger_TSC_CLOCK` | `ON` on x86-64, `OFF` elsewhere | Timestamp log entries with the TSC (`rdtsc`, x86-64 only; needs an invariant TSC) instead of `clock_gettime(CLOCK_REALTIME)`. Defines `TURBOQ_LOGGER_TSC_CLOCK` publicly, so code linking `turboq::logger` sees the same choice. Turning it on for another architecture is a configure error. |
 | `turboq_logger_BUILD_TESTS` | `ON` | Build `*_test.cpp` files as doctest executables and register them with `ctest`. |
+| `turboq_logger_BUILD_BENCHMARKS` | `ON` | Build `*_bm.cpp` files as [Google Benchmark](https://github.com/google/benchmark) executables (fetched when on). |
+| `turboq_logger_SANITIZER` | `OFF` | Build with AddressSanitizer, LeakSanitizer and UndefinedBehaviorSanitizer (turboq too). |
+| `turboq_logger_TSAN` | `OFF` | Build with ThreadSanitizer (turboq too). Not together with `turboq_logger_SANITIZER`. |
 
 ```bash
 cmake -B build -DCMAKE_CXX_COMPILER=g++-14
@@ -60,22 +65,39 @@ target_link_libraries(your_app PRIVATE turboq::logger)
 ### Usage
 
 ```cpp
+#include <turboq_logger/DailyFileSink.h>
 #include <turboq_logger/Logging.h>
 
 using namespace turboq::logger;
 
-BackendThread::setSink(std::make_shared<MySink>()); // a turboq::logger::Sink
+BackendThread::setSink(std::make_shared<DailyFileSink>("logs/app")); // logs/app_20261023.log, ...
 
-TURBOQ_LOGGER_LOG_CALL(LogLevel::Info, "order {} filled at {}", orderID, price);
+setLogLevel(LogLevel::Info);                                       // tq_debug() and below: skipped
+tq_info("order {} filled at {}", orderID, price);
 
 BackendThread::flush(); // wait until this thread's messages are written and the sink flushed
 BackendThread::stop();  // optional: done at exit
 ```
 
+- Sinks: `StdOutSink` (stdout), `FileSink` (one file, appended to or truncated), `DailyFileSink`
+  (`<prefix>_YYYYMMDD.log`, a new file at local midnight), `NullSink`; or derive your own from
+  `Sink`. The text sinks write lines like
+  `2026-10-23 13:24:05.123456789 info    [140367476504512] main.cpp:42 order 7 filled at 101.25`.
 - Each thread logs to its own bounded queue. When it is full, the message is dropped and counted;
   the count is printed to stderr when the queue is destroyed.
 - An exception thrown by the sink skips that one message: it is reported on stderr (at most once
   a second) and the backend carries on.
+
+### Benchmarks
+
+```bash
+cmake -B build-release -DCMAKE_BUILD_TYPE=Release
+cmake --build build-release
+taskset -c 2 ./build-release/code/turboq-logger-Logging-bm
+```
+
+`Logging_bm.cpp` measures the cost of a log call on the calling thread: the level check, the
+timestamp and encoding the arguments into the thread's queue (formatting happens on the backend).
 
 ### License
 

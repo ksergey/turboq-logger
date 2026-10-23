@@ -50,10 +50,12 @@ if (turboq_logger_BUILD_TESTS)
         LIBS doctest::doctest_with_main Threads::Threads ${TargetName})
 endif()
 
-TurboQAddBenchmarksFromSourceList(Sources
-    PREFIX ${TargetName}
-    COMPILE_OPTIONS -Wall -Wextra -g
-    LIBS benchmark::benchmark_main ${TargetName})
+if (turboq_logger_BUILD_BENCHMARKS)
+    TurboQAddBenchmarksFromSourceList(Sources
+        PREFIX ${TargetName}
+        COMPILE_OPTIONS -Wall -Wextra -g
+        LIBS benchmark::benchmark_main ${TargetName})
+endif()
 
 TurboQExcludeTestsAndBenchmarksFromSourceList(Sources)
 

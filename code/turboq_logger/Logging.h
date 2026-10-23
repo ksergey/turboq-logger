@@ -87,10 +87,13 @@ TURBOQ_FORCE_INLINE void logImpl(Args const&... args) {
         ::turboq::logger::logImpl<decltype(infoStore)>(__VA_ARGS__);                                                   \
     } while (0)
 
+/// do/while: a single statement, so `if (c) tq_info("a"); else ...` works
 #define TURBOQ_LOGGER_LOG(LEVEL, FORMAT, ...)                                                                          \
-    if (::turboq::logger::isLogLevelEnabled((LEVEL))) {                                                                \
-        TURBOQ_LOGGER_LOG_CALL(LEVEL, FORMAT __VA_OPT__(, ) __VA_ARGS__);                                              \
-    }
+    do {                                                                                                               \
+        if (::turboq::logger::isLogLevelEnabled((LEVEL))) {                                                            \
+            TURBOQ_LOGGER_LOG_CALL(LEVEL, FORMAT __VA_OPT__(, ) __VA_ARGS__);                                          \
+        }                                                                                                              \
+    } while (0)
 
 #define tq_error(FORMAT, ...) TURBOQ_LOGGER_LOG(::turboq::logger::LogLevel::Error, (FORMAT)__VA_OPT__(, ) __VA_ARGS__)
 #define tq_warn(FORMAT, ...) TURBOQ_LOGGER_LOG(::turboq::logger::LogLevel::Warning, (FORMAT)__VA_OPT__(, ) __VA_ARGS__)

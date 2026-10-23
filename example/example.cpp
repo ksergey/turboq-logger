@@ -1,35 +1,41 @@
 // Copyright (c) Sergey Kovalevich <inndie@gmail.com>
 // SPDX-License-Identifier: MIT
 
+// Usage: example [file <path> | daily <prefix>]
+//   no argument:     messages go to stdout
+//   file <path>:     messages go to the file <path>
+//   daily <prefix>:  messages go to <prefix>_YYYYMMDD.log, a new file each day
+
 #include <cstdio>
+#include <cstdlib>
+#include <exception>
+#include <memory>
+#include <string_view>
 
-#include <fmt/chrono.h>
-#include <fmt/format.h>
-#include <fmt/std.h>
-
+#include <turboq_logger/DailyFileSink.h>
+#include <turboq_logger/FileSink.h>
 #include <turboq_logger/Logging.h>
+#include <turboq_logger/StdOutSink.h>
 
-/// Sink prints to stdout
-class StdOutSink final : public turboq::logger::Sink {
-    void write([[maybe_unused]] std::source_location const& source, turboq::logger::LogLevel level,
-        ::timespec const& timestamp, std::thread::id const& threadID, std::string_view message) override {
-        fmt::print(stdout, "{}.{:09} [{}] {} {}\n", timestamp.tv_sec, timestamp.tv_nsec, logLevelToString(level),
-            threadID, message);
-    }
+int main(int argc, char* argv[]) {
+    using namespace turboq::logger;
 
-    void flush() override {}
-};
-
-int main([[maybe_unused]] int argc, [[maybe_unused]] char* argv[]) {
     try {
-        turboq::logger::BackendThread::setSink(std::make_shared<StdOutSink>());
-        turboq::logger::BackendThread::start();
+        auto const mode = argc > 2 ? std::string_view{argv[1]} : std::string_view{};
+        if (mode == "file") {
+            BackendThread::setSink(std::make_shared<FileSink>(argv[2]));
+        } else if (mode == "daily") {
+            BackendThread::setSink(std::make_shared<DailyFileSink>(argv[2]));
+        } else {
+            BackendThread::setSink(std::make_shared<StdOutSink>());
+        }
+        BackendThread::start();
 
         tq_info("hello {}", "world");
         tq_trace("Point at {}.{}", 10, 15.0);
         tq_trace_l2("Done");
 
-        turboq::logger::BackendThread::stop();
+        BackendThread::stop();
 
     } catch (std::exception const& e) {
         std::fprintf(stderr, "ERROR: %s\n", e.what());

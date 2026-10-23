@@ -9,6 +9,7 @@ else()
 endif()
 option(turboq_logger_TSC_CLOCK "Use TSC clock instead of wall clock (x86-64 only)" ${turboq_logger_TSC_CLOCK_DEFAULT})
 option(turboq_logger_BUILD_TESTS "Build tests (*_test.cpp files, linked against doctest)" ${PROJECT_IS_TOP_LEVEL})
+option(turboq_logger_BUILD_BENCHMARKS "Build benchmarks (*_bm.cpp files, linked against Google Benchmark)" ${PROJECT_IS_TOP_LEVEL})
 option(turboq_logger_SANITIZER "Build with AddressSanitizer, LeakSanitizer and UndefinedBehaviorSanitizer" OFF)
 option(turboq_logger_TSAN "Build with ThreadSanitizer" OFF)
 
@@ -30,6 +31,15 @@ CPMAddPackage(
 if (turboq_logger_BUILD_TESTS)
     CPMAddPackage("gh:doctest/doctest@2.5.2")
     enable_testing()
+endif()
+
+if (turboq_logger_BUILD_BENCHMARKS)
+    CPMAddPackage(
+        NAME benchmark
+        GITHUB_REPOSITORY google/benchmark
+        VERSION 1.10.0
+        OPTIONS "BENCHMARK_ENABLE_TESTING OFF" "BENCHMARK_ENABLE_GTEST_TESTS OFF" "BENCHMARK_ENABLE_INSTALL OFF"
+            "BENCHMARK_ENABLE_WERROR OFF" "BENCHMARK_INSTALL_DOCS OFF")
 endif()
 
 add_subdirectory(code)
