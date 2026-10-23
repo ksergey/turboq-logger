@@ -5,6 +5,7 @@
 
 #include <algorithm>
 #include <atomic>
+#include <cstdio>
 #include <functional>
 #include <memory>
 #include <mutex>
@@ -12,6 +13,8 @@
 #include <string>
 #include <thread>
 #include <vector>
+
+#include <unistd.h>
 
 #include <doctest/doctest.h>
 
@@ -63,6 +66,30 @@ public:
         return flushes_.load(std::memory_order_relaxed);
     }
 };
+
+/// Return what fn() writes to stderr
+template <typename Fn>
+auto captureStderr(Fn&& fn) -> std::string {
+    std::fflush(stderr);
+    auto* const file = std::tmpfile();
+    REQUIRE(file != nullptr);
+    auto const saved = ::dup(STDERR_FILENO);
+    ::dup2(::fileno(file), STDERR_FILENO);
+
+    fn();
+
+    std::fflush(stderr);
+    ::dup2(saved, STDERR_FILENO);
+    ::close(saved);
+
+    std::string output;
+    std::rewind(file);
+    for (int c = std::fgetc(file); c != EOF; c = std::fgetc(file)) {
+        output.push_back(static_cast<char>(c));
+    }
+    std::fclose(file);
+    return output;
+}
 
 /// Leaves the backend stopped, with no sink, at the end of a test
 struct Cleanup {
@@ -224,7 +251,7 @@ TEST_SUITE("BackendThread") {
         CHECK_EQ(second->messages(), std::vector<std::string>{"to second"});
     }
 
-    TEST_CASE("drops reach Sink::dropped(), which by default writes a warning") {
+    TEST_CASE("drops are printed to stderr once the thread's queue is drained and dropped") {
         constexpr int kMessageCount = 200;
 
         Cleanup cleanup;
@@ -238,20 +265,22 @@ TEST_SUITE("BackendThread") {
             for (int i = 0; i < kMessageCount; ++i) {
                 TURBOQ_LOGGER_LOG_CALL(LogLevel::Info, "message {}", i);
             }
-        }}.join();
+        }}.join(); // the thread's producer is gone: its queue closes
         Backend::setQueueCapacity(previous);
 
-        BackendThread::start();
-        BackendThread::stop();
+        // the backend drains the closed queue, then drops (destroys) its consumer
+        auto const output = captureStderr([] {
+            BackendThread::start();
+            BackendThread::stop();
+        });
 
-        auto const messages = sink->messages();
-        REQUIRE_FALSE(messages.empty());
         auto const delivered = sink->count("message ");
-        auto const expected =
-            "turboq-logger: " + std::to_string(kMessageCount - delivered) + " message(s) dropped, queue full";
         CHECK_GT(delivered, 0);
         CHECK_LT(delivered, kMessageCount);
-        CHECK_EQ(messages.back(), expected);
+        auto const expected = "turboq-logger: " + std::to_string(kMessageCount - delivered) +
+                              " message(s) dropped, queue full (capacity 4096 bytes)\n";
+        CHECK_EQ(output, expected);
+        CHECK_EQ(sink->count("turboq-logger"), 0); // stderr only, not the sink
     }
 }
 

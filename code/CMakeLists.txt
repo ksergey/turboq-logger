@@ -26,6 +26,20 @@ if (turboq_logger_TSC_CLOCK)
         PUBLIC TURBOQ_LOGGER_TSC_CLOCK)
 endif()
 
+if (turboq_logger_SANITIZER)
+    # vptr off: turboq is built with -fno-rtti, so mixing it with RTTI code (doctest) makes the
+    # vptr check report false positives
+    set(turboq_logger_SANITIZER_FLAGS -fsanitize=address,leak,undefined -fno-sanitize=vptr -fno-omit-frame-pointer)
+elseif (turboq_logger_TSAN)
+    set(turboq_logger_SANITIZER_FLAGS -fsanitize=thread -fno-omit-frame-pointer)
+endif()
+if (turboq_logger_SANITIZER_FLAGS)
+    target_compile_options(${TargetName}
+        PUBLIC ${turboq_logger_SANITIZER_FLAGS})
+    target_link_options(${TargetName}
+        PUBLIC ${turboq_logger_SANITIZER_FLAGS})
+endif()
+
 file(GLOB_RECURSE Sources "${CMAKE_CURRENT_SOURCE_DIR}/turboq_logger/*.cpp")
 file(GLOB_RECURSE Headers "${CMAKE_CURRENT_SOURCE_DIR}/turboq_logger/*.h")
 
