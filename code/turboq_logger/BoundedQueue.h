@@ -25,10 +25,10 @@ namespace detail {
 
 // Shared state kept in the queue's reserved region (turboq Options::reserveSpace)
 struct BoundedQueueControl {
-    // set by the producer's destructor, cleared when a producer is created
+    // Set by the producer's destructor, cleared when a producer is created
     bool closed;
-    // messages the producer couldn't enqueue (queue full); written by the producer only
-    std::uint64_t dropped;
+    // Messages the producer couldn't enqueue (queue full); written by the producer only
+    std::size_t dropped;
 };
 
 static_assert(std::atomic_ref<bool>::is_always_lock_free);
@@ -123,14 +123,12 @@ private:
 class BoundedQueueConsumer {
 private:
     detail::BoundedQueueImpl::Consumer impl_;
-    std::uint64_t droppedSeen_{0};
 
 public:
     BoundedQueueConsumer() = default;
 
     explicit BoundedQueueConsumer(detail::BoundedQueueImpl::Consumer&& impl) noexcept : impl_{std::move(impl)} {
         assert(impl_);
-        droppedSeen_ = std::atomic_ref(this->control().dropped).load(std::memory_order_relaxed);
     }
 
     /// Return true on initialized
@@ -176,10 +174,9 @@ public:
         return std::atomic_ref(this->control().closed).load(std::memory_order_acquire) && impl_.fetch().empty();
     }
 
-    /// Return the number of messages the producer dropped (queue full) since the previous call
-    [[nodiscard]] TURBOQ_FORCE_INLINE auto takeDropped() noexcept -> std::uint64_t {
-        auto const dropped = std::atomic_ref(this->control().dropped).load(std::memory_order_relaxed);
-        return dropped - std::exchange(droppedSeen_, dropped);
+    /// Return the number of messages the producer dropped (queue full)
+    [[nodiscard]] TURBOQ_FORCE_INLINE auto dropped() noexcept -> std::size_t {
+        return std::atomic_ref(this->control().dropped).load(std::memory_order_relaxed);
     }
 
 private:

@@ -41,17 +41,10 @@ struct LogValueEvent {
     double value;
 };
 
-/// A queue was full: count messages logged to it were discarded
-struct DroppedMessagesEvent {
-    std::uint64_t count;
-};
-
 template <typename SinkFn>
-concept EventSink = requires(SinkFn& sink, LogMessageEvent const& logMessageEvent, LogValueEvent const& logValueEvent,
-    DroppedMessagesEvent const& droppedMessagesEvent) {
+concept EventSink = requires(SinkFn& sink, LogMessageEvent const& logMessageEvent, LogValueEvent const& logValueEvent) {
     sink(logMessageEvent);
     sink(logValueEvent);
-    sink(droppedMessagesEvent);
 };
 
 namespace detail {
@@ -122,13 +115,6 @@ public:
                 }
                 consumer.consume(); // even on error: retrying the entry would fail again
                 ++processedCount;
-            }
-            if (auto const dropped = consumer.takeDropped(); dropped != 0) [[unlikely]] {
-                try {
-                    sink(DroppedMessagesEvent{.count = dropped});
-                } catch (...) {
-                    detail::reportBackendError(std::current_exception());
-                }
             }
         });
 

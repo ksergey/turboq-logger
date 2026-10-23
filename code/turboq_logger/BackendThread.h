@@ -280,9 +280,6 @@ private:
                     event.location, event.level, Clock::toTimeSpec(event.timestamp), event.threadID, event.message);
             }
             void operator()([[maybe_unused]] LogValueEvent const& event) {}
-            void operator()(DroppedMessagesEvent const& event) {
-                sink->dropped(event.count);
-            }
         };
         auto const currentSink = [&]() -> Sink& {
             return sink ? *sink : nullSink;

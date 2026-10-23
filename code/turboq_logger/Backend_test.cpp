@@ -31,8 +31,7 @@ struct RecordedMessage {
 
 struct RecordingSink {
     std::vector<RecordedMessage> messages;
-    std::vector<std::uint64_t> dropped;
-    // everything in arrival order: messages as is, drops as "<dropped N>"
+    // everything in arrival order: messages as is
     std::vector<std::string> events;
     // messages starting with this prefix make the sink throw
     std::string throwOn;
@@ -51,11 +50,6 @@ struct RecordingSink {
     }
 
     void operator()([[maybe_unused]] LogValueEvent const& event) {}
-
-    void operator()(DroppedMessagesEvent const& event) {
-        dropped.push_back(event.count);
-        events.push_back("<dropped " + std::to_string(event.count) + ">");
-    }
 };
 
 static_assert(EventSink<RecordingSink>);
@@ -123,7 +117,6 @@ TEST_SUITE("Backend") {
         CHECK_EQ(sink.messages[0].level, LogLevel::Notice);
         CHECK_EQ(sink.messages[0].line, line);
         CHECK_EQ(sink.messages[0].threadID, std::this_thread::get_id());
-        CHECK(sink.dropped.empty());
     }
 
     TEST_CASE("an entry the sink throws on is skipped, and the entries after it are delivered") {
@@ -143,64 +136,6 @@ TEST_SUITE("Backend") {
         CHECK_EQ(backend.poll(sink), 5);
         CHECK_EQ(backend.poll(sink), 0);
         CHECK_EQ(sink.events, std::vector<std::string>{"good 0", "good 2", "good 4"});
-    }
-
-    TEST_CASE("drops are reported once, after the messages of that queue that fit") {
-        constexpr int kMessageCount = 200;
-
-        Backend backend;
-        RecordingSink sink;
-        drain(backend, sink);
-        sink = {};
-
-        auto const previous = Backend::queueCapacity();
-        Backend::setQueueCapacity(4096); // a few dozen entries
-        std::thread{[] {
-            for (int i = 0; i < kMessageCount; ++i) {
-                TURBOQ_LOGGER_LOG_CALL(LogLevel::Info, "message {}", i);
-            }
-        }}.join();
-        Backend::setQueueCapacity(previous);
-
-        drain(backend, sink);
-        REQUIRE_EQ(sink.dropped.size(), 1);
-        CHECK_GT(sink.dropped[0], 0);
-        CHECK_EQ(sink.messages.size() + sink.dropped[0], kMessageCount);
-        CHECK(sink.events.back().starts_with("<dropped "));
-        // the ones that fit are the first ones, in order
-        for (std::size_t i = 0; i < sink.messages.size(); ++i) {
-            CHECK_EQ(sink.messages[i].message, "message " + std::to_string(i));
-        }
-
-        // reported once
-        CHECK_EQ(backend.poll(sink), 0);
-        CHECK_EQ(sink.dropped.size(), 1);
-    }
-
-    TEST_CASE("a sink throwing on a drop report doesn't stop the poll") {
-        struct Sink : RecordingSink {
-            using RecordingSink::operator();
-            void operator()(DroppedMessagesEvent const&) {
-                throw std::runtime_error{"sink failure (test)"};
-            }
-        };
-
-        Backend backend;
-        Sink sink;
-        drain(backend, sink);
-        sink.messages.clear();
-
-        auto const previous = Backend::queueCapacity();
-        Backend::setQueueCapacity(4096);
-        std::thread{[] {
-            for (int i = 0; i < 200; ++i) {
-                TURBOQ_LOGGER_LOG_CALL(LogLevel::Info, "message {}", i);
-            }
-        }}.join();
-        Backend::setQueueCapacity(previous);
-
-        CHECK_NOTHROW(drain(backend, sink));
-        CHECK_FALSE(sink.messages.empty());
     }
 }
 

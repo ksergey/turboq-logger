@@ -11,8 +11,6 @@
 namespace turboq::logger {
 namespace {
 
-constexpr std::size_t kDefaultQueueCapacity = (1u << 20);
-
 std::atomic<bool> backendExists{false};
 
 } // namespace
@@ -54,7 +52,7 @@ Backend::~Backend() {
 }
 
 auto Backend::registry() -> ThreadQueueRegistry& {
-    static ThreadQueueRegistry registry{BoundedQueue::CreationOptions{.capacityHint = kDefaultQueueCapacity}};
+    static ThreadQueueRegistry registry{BoundedQueue::CreationOptions{.capacityHint = (1u << 20)}};
     return registry;
 }
 

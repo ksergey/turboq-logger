@@ -126,31 +126,20 @@ TEST_SUITE("BoundedQueue") {
         CHECK_EQ(expected, kMessageCount);
     }
 
-    TEST_CASE("takeDropped() returns the drops counted since the previous call") {
+    TEST_CASE("dropped() returns the drops counted") {
         auto queue = makeQueue();
         auto producer = queue.createProducer();
         auto consumer = queue.createConsumer();
 
-        CHECK_EQ(consumer.takeDropped(), 0);
+        CHECK_EQ(consumer.dropped(), 0);
         producer.countDropped();
         producer.countDropped();
         producer.countDropped();
-        CHECK_EQ(consumer.takeDropped(), 3);
-        CHECK_EQ(consumer.takeDropped(), 0); // already taken
+        CHECK_EQ(consumer.dropped(), 3);
+        CHECK_EQ(consumer.dropped(), 3);
 
         producer.countDropped();
-        CHECK_EQ(consumer.takeDropped(), 1);
-    }
-
-    TEST_CASE("a consumer created later doesn't report drops counted before it existed") {
-        auto queue = makeQueue();
-        auto producer = queue.createProducer();
-        producer.countDropped();
-
-        auto consumer = queue.createConsumer();
-        CHECK_EQ(consumer.takeDropped(), 0);
-        producer.countDropped();
-        CHECK_EQ(consumer.takeDropped(), 1);
+        CHECK_EQ(consumer.dropped(), 4);
     }
 
     TEST_CASE("drops counted on a full queue reach a consumer on another thread") {
@@ -178,7 +167,7 @@ TEST_SUITE("BoundedQueue") {
             ++received;
         }
         CHECK_EQ(received, enqueued);
-        CHECK_EQ(consumer.takeDropped(), dropped);
+        CHECK_EQ(consumer.dropped(), dropped);
     }
 }
 
