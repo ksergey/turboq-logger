@@ -25,9 +25,9 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char* argv[]) {
         turboq::logger::BackendThread::setSink(std::make_shared<StdOutSink>());
         turboq::logger::BackendThread::start();
 
-        TURBOQ_LOGGER_LOG_CALL(turboq::logger::LogLevel::Info, "Hello {}", "world");
-        TURBOQ_LOGGER_LOG_CALL(turboq::logger::LogLevel::TraceL1, "Point at {}.{}", 10, 15.0);
-        TURBOQ_LOGGER_LOG_CALL(turboq::logger::LogLevel::TraceL2, "Done");
+        tq_info("hello {}", "world");
+        tq_trace("Point at {}.{}", 10, 15.0);
+        tq_trace_l2("Done");
 
         turboq::logger::BackendThread::stop();
 

@@ -86,3 +86,21 @@ TURBOQ_FORCE_INLINE void logImpl(Args const&... args) {
         } infoStore;                                                                                                   \
         ::turboq::logger::logImpl<decltype(infoStore)>(__VA_ARGS__);                                                   \
     } while (0)
+
+#define TURBOQ_LOGGER_LOG(LEVEL, FORMAT, ...)                                                                          \
+    if (::turboq::logger::isLogLevelEnabled((LEVEL))) {                                                                \
+        TURBOQ_LOGGER_LOG_CALL(LEVEL, FORMAT __VA_OPT__(, ) __VA_ARGS__);                                              \
+    }
+
+#define tq_error(FORMAT, ...) TURBOQ_LOGGER_LOG(::turboq::logger::LogLevel::Error, (FORMAT)__VA_OPT__(, ) __VA_ARGS__)
+#define tq_warn(FORMAT, ...) TURBOQ_LOGGER_LOG(::turboq::logger::LogLevel::Warning, (FORMAT)__VA_OPT__(, ) __VA_ARGS__)
+#define tq_notice(FORMAT, ...) TURBOQ_LOGGER_LOG(::turboq::logger::LogLevel::Notice, (FORMAT)__VA_OPT__(, ) __VA_ARGS__)
+#define tq_info(FORMAT, ...) TURBOQ_LOGGER_LOG(::turboq::logger::LogLevel::Info, (FORMAT)__VA_OPT__(, ) __VA_ARGS__)
+#define tq_debug(FORMAT, ...) TURBOQ_LOGGER_LOG(::turboq::logger::LogLevel::Debug, (FORMAT)__VA_OPT__(, ) __VA_ARGS__)
+#define tq_trace(FORMAT, ...) TURBOQ_LOGGER_LOG(::turboq::logger::LogLevel::TraceL1, (FORMAT)__VA_OPT__(, ) __VA_ARGS__)
+#define tq_trace_l1(FORMAT, ...)                                                                                       \
+    TURBOQ_LOGGER_LOG(::turboq::logger::LogLevel::TraceL1, (FORMAT)__VA_OPT__(, ) __VA_ARGS__)
+#define tq_trace_l2(FORMAT, ...)                                                                                       \
+    TURBOQ_LOGGER_LOG(::turboq::logger::LogLevel::TraceL2, (FORMAT)__VA_OPT__(, ) __VA_ARGS__)
+#define tq_trace_l3(FORMAT, ...)                                                                                       \
+    TURBOQ_LOGGER_LOG(::turboq::logger::LogLevel::TraceL3, (FORMAT)__VA_OPT__(, ) __VA_ARGS__)

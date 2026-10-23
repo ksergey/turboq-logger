@@ -8,6 +8,8 @@
 #include <optional>
 #include <string_view>
 
+#include <turboq/Platform.h>
+
 namespace turboq::logger {
 
 enum class LogLevel : std::uint8_t {
@@ -69,13 +71,18 @@ static_assert(std::atomic<LogLevel>::is_always_lock_free);
 } // namespace detail
 
 /// Return the log level (default: LogLevel::TraceL3). Thread-safe.
-[[nodiscard]] inline auto logLevel() noexcept -> LogLevel {
+[[nodiscard]] TURBOQ_FORCE_INLINE auto logLevel() noexcept -> LogLevel {
     return detail::logLevel.load(std::memory_order_relaxed);
 }
 
 /// Set the log level. Thread-safe.
-inline void setLogLevel(LogLevel level) noexcept {
+TURBOQ_FORCE_INLINE void setLogLevel(LogLevel level) noexcept {
     detail::logLevel.store(level, std::memory_order_relaxed);
+}
+
+/// Return true if messages of level pass threshold
+[[nodiscard]] TURBOQ_FORCE_INLINE auto isLogLevelEnabled(LogLevel level) noexcept -> bool {
+    return level <= logLevel();
 }
 
 } // namespace turboq::logger
