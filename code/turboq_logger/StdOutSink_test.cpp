@@ -128,7 +128,7 @@ TEST_SUITE("StdOutSink") {
         formatter.format(expected, location, LogLevel::Info, ts, std::this_thread::get_id(), "second");
 
         auto const output = captureStdout([&] {
-            StdOutSink sink; // constructed while stdout is a file: no colors, even when run in a terminal
+            StdOutSink sink;
             sink.write(location, LogLevel::Warning, ts, std::this_thread::get_id(), "first");
             sink.write(location, LogLevel::Info, ts, std::this_thread::get_id(), "second");
             sink.flush();
@@ -152,48 +152,6 @@ TEST_SUITE("StdOutSink") {
             sink.flush();
         });
         CHECK_EQ(output, "   info: custom\n");
-    }
-
-    TEST_CASE("Auto: no colors when stdout isn't a terminal; Always colors anyway") {
-        auto const output = captureStdout([&] {
-            StdOutSink automatic{makeFormatter<"{level}">()};
-            CHECK_FALSE(automatic.formatter().colorsEnabled());
-            automatic.write(kLocation, LogLevel::Error, {}, std::this_thread::get_id(), "");
-
-            StdOutSink always{makeFormatter<"{level}">({.colors = ColorMode::Always})};
-            always.write(kLocation, LogLevel::Error, {}, std::this_thread::get_id(), "");
-            always.flush();
-        });
-        CHECK_EQ(output, "error\n" + fmt::format(kDefaultLevelStyles[0], "error") + "\n");
-    }
-
-    TEST_CASE("Auto: colors when stdout is a terminal, unless NO_COLOR is set") {
-        auto const colorsOnTerminal = [](char const* noColor) {
-            EnvVar env{"NO_COLOR", noColor};
-            return onTerminal([] {
-                return StdOutSink{}.formatter().colorsEnabled();
-            });
-        };
-        CHECK(colorsOnTerminal(nullptr));
-        CHECK(colorsOnTerminal("")); // empty: not set (https://no-color.org)
-        CHECK_FALSE(colorsOnTerminal("1"));
-    }
-
-    TEST_CASE("on a terminal the default formatter colors the whole line") {
-        std::string output;
-        onTerminal([&] {
-            StdOutSink sink;
-            sink.write(kLocation, LogLevel::Warning, {}, std::this_thread::get_id(), "careful");
-            sink.flush();
-            output = readTerminal();
-            return true;
-        });
-        // the whole line yellow: starts with the escape code, the reset ends it
-        auto const yellow = fmt::format(fmt::fg(fmt::terminal_color::yellow), "{}", "");
-        auto const reset = std::string_view{"\x1b[0m"};
-        CHECK(output.starts_with(yellow.substr(0, yellow.size() - reset.size())));
-        CHECK(output.find("warning [") != std::string::npos);
-        CHECK(output.find(std::string{"careful"} + std::string{reset}) != std::string::npos);
     }
 }
 

@@ -12,19 +12,9 @@
 #include <unistd.h>
 
 namespace turboq::logger {
-namespace {
-
-auto noColorRequested() noexcept -> bool {
-    auto const* const value = std::getenv("NO_COLOR");
-    return value != nullptr && value[0] != '\0';
-}
-
-} // namespace
 
 StdOutSink::StdOutSink(std::unique_ptr<FormatterBase> formatter)
-    : formatter_{formatter ? std::move(formatter) : std::make_unique<DefaultFormatter>()} {
-    formatter_->resolveAutoColors(::isatty(STDOUT_FILENO) == 1 && !noColorRequested());
-}
+    : formatter_{formatter ? std::move(formatter) : std::make_unique<DefaultFormatter>()} {}
 
 void StdOutSink::write(std::source_location const& location, LogLevel level, ::timespec const& timestamp,
     std::thread::id const& threadID, std::string_view message) {

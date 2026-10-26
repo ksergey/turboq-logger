@@ -175,20 +175,6 @@ TEST_SUITE("FileSink") {
         CHECK_EQ(readFile(dir.path() / "app.log"), "notice|FileSink_test.cpp|custom\n");
     }
 
-    TEST_CASE("colors: Auto means none in a file, Always writes them") {
-        TempDir dir;
-        {
-            FileSink automatic{dir.path() / "auto.log", makeFormatter<"{level}">()};
-            CHECK_FALSE(automatic.formatter().colorsEnabled());
-            log(automatic, "", LogLevel::Error);
-
-            FileSink always{dir.path() / "always.log", makeFormatter<"{level}">({.colors = ColorMode::Always})};
-            log(always, "", LogLevel::Error);
-        }
-        CHECK_EQ(readFile(dir.path() / "auto.log"), "error\n");
-        CHECK_EQ(readFile(dir.path() / "always.log"), fmt::format(kDefaultLevelStyles[0], "error") + "\n");
-    }
-
     TEST_CASE("end to end: tq_* calls from several threads through the backend thread") {
         constexpr int kThreads = 4;
         constexpr int kMessages = 500;

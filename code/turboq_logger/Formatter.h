@@ -18,42 +18,12 @@
 #include <utility>
 
 #include <fmt/chrono.h>
-#include <fmt/color.h>
 #include <fmt/compile.h>
 #include <fmt/format.h>
 
 #include "LogLevel.h"
 
 namespace turboq::logger {
-
-/// Whether a formatter colors its lines (each line whole, in the style of its level)
-enum class ColorMode {
-    Never,  ///< no escape codes
-    Always, ///< ANSI escape codes
-    Auto,   ///< the sink decides: StdOutSink colors when stdout is a terminal and NO_COLOR isn't set,
-            ///< the file sinks never do
-};
-
-/// Number of LogLevel values (index of FormatterOptions::levelStyles)
-inline constexpr std::size_t kLogLevelCount = 8;
-
-/// Default line style, per LogLevel
-inline constexpr std::array<fmt::text_style, kLogLevelCount> kDefaultLevelStyles = {
-    fmt::fg(fmt::terminal_color::red) | fmt::emphasis::bold, // Error
-    fmt::fg(fmt::terminal_color::yellow),                    // Warning
-    fmt::fg(fmt::terminal_color::cyan),                      // Notice
-    fmt::fg(fmt::terminal_color::green),                     // Info
-    fmt::fg(fmt::terminal_color::blue),                      // Debug
-    fmt::emphasis::faint,                                    // TraceL1
-    fmt::emphasis::faint,                                    // TraceL2
-    fmt::emphasis::faint,                                    // TraceL3
-};
-
-struct FormatterOptions {
-    ColorMode colors = ColorMode::Auto;
-    /// Style of a line, indexed by its LogLevel
-    std::array<fmt::text_style, kLogLevelCount> levelStyles = kDefaultLevelStyles;
-};
 
 /// The values of one log line, as the fields of a pattern see them
 struct LineFields {
@@ -71,14 +41,8 @@ struct LineFields {
 /// ColorMode) around the text of formatLine(). Not thread-safe: one formatter per sink (sinks run
 /// on the backend thread).
 class FormatterBase {
-private:
-    ColorMode colorMode_;
-    bool colorsEnabled_;
-    // escape code starting each level's style ("" for an empty style)
-    std::array<std::string, kLogLevelCount> colorCodes_;
-
 public:
-    explicit FormatterBase(FormatterOptions const& options = {});
+    FormatterBase() = default;
     virtual ~FormatterBase() = default;
 
     FormatterBase(FormatterBase const&) = delete;
@@ -87,19 +51,6 @@ public:
     /// Append the line for this message to out, '\n' included
     void format(fmt::memory_buffer& out, std::source_location const& location, LogLevel level,
         ::timespec const& timestamp, std::thread::id const& threadID, std::string_view message);
-
-    /// Settle ColorMode::Auto: colors on or off. Called by the sinks, which know whether they write
-    /// to a terminal; no effect with ColorMode::Never or ColorMode::Always.
-    void resolveAutoColors(bool enabled) noexcept;
-
-    [[nodiscard]] auto colorMode() const noexcept -> ColorMode {
-        return colorMode_;
-    }
-
-    /// True if lines are colored
-    [[nodiscard]] auto colorsEnabled() const noexcept -> bool {
-        return colorsEnabled_;
-    }
 
     /// The file name part of a path ("a/b/c.cpp" -> "c.cpp")
     [[nodiscard]] static constexpr auto baseName(std::string_view path) noexcept -> std::string_view {
@@ -368,7 +319,7 @@ private:
     std::array<std::string, kTimeCount> timeTexts_;
 
 public:
-    explicit Formatter(FormatterOptions const& options = {}) : FormatterBase{options} {}
+    explicit Formatter() = default;
 
     /// The pattern, as written
     [[nodiscard]] static constexpr auto pattern() noexcept -> std::string_view {
@@ -418,8 +369,8 @@ using DefaultFormatter = Formatter<kDefaultPattern>;
 
 /// A Formatter for Pattern, as the sinks take it
 template <FixedString Pattern = kDefaultPattern>
-[[nodiscard]] auto makeFormatter(FormatterOptions const& options = {}) -> std::unique_ptr<FormatterBase> {
-    return std::make_unique<Formatter<Pattern>>(options);
+[[nodiscard]] auto makeFormatter() -> std::unique_ptr<FormatterBase> {
+    return std::make_unique<Formatter<Pattern>>();
 }
 
 } // namespace turboq::logger

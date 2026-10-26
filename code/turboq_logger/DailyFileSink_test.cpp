@@ -230,10 +230,9 @@ TEST_SUITE("DailyFileSink") {
         CHECK_EQ(messagesIn(prefix.string() + "_20301028.log"), std::vector<std::string>{"after autumn"});
     }
 
-    TEST_CASE("a custom formatter; Auto colors mean none") {
+    TEST_CASE("a custom formatter") {
         TempDir dir;
         DailyFileSink sink{dir.path() / "app", makeFormatter<"{time:%F}|{level}|{message}">()};
-        CHECK_FALSE(sink.formatter().colorsEnabled());
         log(sink, localTime(2030, 5, 6), "custom");
         sink.flush();
         std::ifstream file{sink.path()};

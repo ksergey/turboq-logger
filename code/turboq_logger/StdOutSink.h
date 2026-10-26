@@ -5,6 +5,7 @@
 
 #include <memory>
 
+#include <fmt/color.h>
 #include <fmt/format.h>
 
 #include "Formatter.h"
@@ -34,9 +35,11 @@ public:
         return *formatter_;
     }
 
+    /// \see Sink
     void write(std::source_location const& location, LogLevel level, ::timespec const& timestamp,
         std::thread::id const& threadID, std::string_view message) override;
 
+    /// \see Sink
     void flush() override;
 };
 

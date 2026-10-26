@@ -32,7 +32,6 @@ DailyFileSink::DailyFileSink(
     std::filesystem::path prefix, std::unique_ptr<FormatterBase> formatter, DailyFileSinkOptions const& options)
     : prefix_{std::move(prefix)}, options_{options},
       formatter_{formatter ? std::move(formatter) : std::make_unique<DefaultFormatter>()} {
-    formatter_->resolveAutoColors(false);
     this->open(now());
 }
 

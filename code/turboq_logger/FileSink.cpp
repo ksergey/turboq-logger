@@ -11,9 +11,7 @@ FileSink::FileSink(std::filesystem::path path, std::unique_ptr<FormatterBase> fo
     : file_{std::move(path), options.truncate ? detail::LogFile::Mode::Truncate : detail::LogFile::Mode::Append,
           options.bufferSize},
       fsyncOnFlush_{options.fsyncOnFlush},
-      formatter_{formatter ? std::move(formatter) : std::make_unique<DefaultFormatter>()} {
-    formatter_->resolveAutoColors(false);
-}
+      formatter_{formatter ? std::move(formatter) : std::make_unique<DefaultFormatter>()} {}
 
 void FileSink::write(std::source_location const& location, LogLevel level, ::timespec const& timestamp,
     std::thread::id const& threadID, std::string_view message) {

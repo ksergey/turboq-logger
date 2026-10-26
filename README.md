@@ -102,11 +102,6 @@ time. The default pattern gives
 BackendThread::setSink(std::make_shared<StdOutSink>(
     makeFormatter<"{time:%T}.{ms:03} {level:>7} {file}:{line} {message}">()));
 
-// a file, colored for `less -R`
-BackendThread::setSink(std::make_shared<FileSink>("logs/app.log",
-    makeFormatter<"{time:%F %T} {level:<7} {message}">({.colors = ColorMode::Always})));
-```
-
 | Field | Value | Format spec examples |
 |---|---|---|
 | `{time}` | `std::tm`, local time | any fmt chrono spec: `{time:%F %T}`, `{time:%H:%M}` |
@@ -124,11 +119,6 @@ BackendThread::setSink(std::make_shared<FileSink>("logs/app.log",
 - Literal braces are doubled: `{{` and `}}`. A `'\n'` ends every line.
 - The sinks take a `std::unique_ptr<FormatterBase>`; `nullptr` (the default) is `DefaultFormatter`.
   Derive from `FormatterBase` for a format of your own.
-- Colors (`FormatterOptions::colors`): the whole line is written in the style of its level.
-  `ColorMode::Auto` (the default) lets the sink decide -- `StdOutSink` colors when stdout is a
-  terminal and [`NO_COLOR`](https://no-color.org) isn't set, the file sinks never do; `Always`
-  and `Never` force it. The styles per level are `FormatterOptions::levelStyles`
-  (`fmt::text_style`).
 - At compile time the names become positional arguments of an fmt compiled format, and the time
   fields are formatted once per second: the default pattern takes ~185 ns a line on the backend
   thread.

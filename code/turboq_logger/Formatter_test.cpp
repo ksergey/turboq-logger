@@ -47,8 +47,8 @@ auto formatLine(FormatterBase& formatter, ::timespec const& timestamp, std::stri
 /// The line of one message with Pattern, without its '\n'
 template <FixedString Pattern>
 auto formatWith(std::string_view message = "hello", LogLevel level = LogLevel::Info,
-    ::timespec const& timestamp = kTimestamp, ColorMode colors = ColorMode::Never) -> std::string {
-    Formatter<Pattern> formatter{{.colors = colors}};
+    ::timespec const& timestamp = kTimestamp) -> std::string {
+    Formatter<Pattern> formatter;
     auto line = formatLine(formatter, timestamp, message, level);
     REQUIRE(line.ends_with('\n'));
     line.pop_back();
@@ -203,70 +203,9 @@ TEST_SUITE("Formatter fields") {
     }
 
     TEST_CASE("makeFormatter(): a FormatterBase for the sinks") {
-        auto const formatter = makeFormatter<"{level}: {message}">({.colors = ColorMode::Never});
+        auto const formatter = makeFormatter<"{level}: {message}">();
         REQUIRE(formatter);
         CHECK_EQ(formatLine(*formatter, kTimestamp, "x", LogLevel::Notice), "notice: x\n");
-        CHECK_EQ(makeFormatter()->colorMode(), ColorMode::Auto); // the default pattern and options
-    }
-}
-
-TEST_SUITE("Formatter colors") {
-
-    TEST_CASE("default options: Auto, off until a sink resolves it") {
-        DefaultFormatter formatter;
-        CHECK_EQ(formatter.colorMode(), ColorMode::Auto);
-        CHECK_FALSE(formatter.colorsEnabled());
-    }
-
-    TEST_CASE("Always: the whole line in the style of its level, reset before the newline") {
-        constexpr std::array kLevels{LogLevel::Error, LogLevel::Warning, LogLevel::Notice, LogLevel::Info,
-            LogLevel::Debug, LogLevel::TraceL1, LogLevel::TraceL2, LogLevel::TraceL3};
-        for (auto const level : kLevels) {
-            CAPTURE(logLevelToString(level));
-            auto const& style = kDefaultLevelStyles[static_cast<std::size_t>(level)];
-            CHECK_EQ(formatWith<"{level} {message}">("text", level, kTimestamp, ColorMode::Always),
-                fmt::format(style, "{} text", logLevelToString(level)));
-        }
-    }
-
-    TEST_CASE("the default pattern, colored") {
-        DefaultFormatter formatter{{.colors = ColorMode::Always}};
-        auto const line = formatLine(formatter, {.tv_sec = k20261023_102405, .tv_nsec = 0}, "m", LogLevel::Warning);
-        auto plain = "2026-10-23 10:24:05.000000000" + defaultSuffix("warning", "m");
-        plain.pop_back();
-        CHECK_EQ(line, fmt::format(fmt::fg(fmt::terminal_color::yellow), "{}", plain) + "\n");
-    }
-
-    TEST_CASE("Never: no escape codes") {
-        CHECK_EQ(formatWith<"{level}">("", LogLevel::Error, kTimestamp, ColorMode::Never), "error");
-    }
-
-    TEST_CASE("Auto: off until resolved, then as resolved; Never and Always ignore it") {
-        Formatter<"x"> automatic{{.colors = ColorMode::Auto}};
-        CHECK_EQ(formatLine(automatic, {}, "", LogLevel::Error), "x\n");
-        automatic.resolveAutoColors(true);
-        CHECK(automatic.colorsEnabled());
-        CHECK_EQ(formatLine(automatic, {}, "", LogLevel::Error), fmt::format(kDefaultLevelStyles[0], "x") + "\n");
-        automatic.resolveAutoColors(false);
-        CHECK_EQ(formatLine(automatic, {}, "", LogLevel::Error), "x\n");
-
-        DefaultFormatter never{{.colors = ColorMode::Never}};
-        never.resolveAutoColors(true);
-        CHECK_FALSE(never.colorsEnabled());
-
-        DefaultFormatter always{{.colors = ColorMode::Always}};
-        always.resolveAutoColors(false);
-        CHECK(always.colorsEnabled());
-    }
-
-    TEST_CASE("custom level styles; an empty style writes no escape codes at all") {
-        auto styles = kDefaultLevelStyles;
-        styles[static_cast<std::size_t>(LogLevel::Info)] = fmt::fg(fmt::color::orange) | fmt::emphasis::italic;
-        styles[static_cast<std::size_t>(LogLevel::Debug)] = fmt::text_style{};
-        Formatter<"{level}"> formatter{{.colors = ColorMode::Always, .levelStyles = styles}};
-        CHECK_EQ(formatLine(formatter, {}, "", LogLevel::Info),
-            fmt::format(fmt::fg(fmt::color::orange) | fmt::emphasis::italic, "info") + "\n");
-        CHECK_EQ(formatLine(formatter, {}, "", LogLevel::Debug), "debug\n");
     }
 }
 

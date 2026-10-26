@@ -41,12 +41,6 @@ void BM_Format_Default_NewSecond(benchmark::State& state) {
 }
 BENCHMARK(BM_Format_Default_NewSecond);
 
-void BM_Format_DefaultColors(benchmark::State& state) {
-    DefaultFormatter formatter{{.colors = ColorMode::Always}};
-    runFormat(state, formatter);
-}
-BENCHMARK(BM_Format_DefaultColors);
-
 void BM_Format_Short(benchmark::State& state) {
     Formatter<"{time:%T}.{ms:03} {level} {message}"> formatter;
     runFormat(state, formatter);
