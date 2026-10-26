@@ -99,21 +99,6 @@ auto onTerminal(Fn&& fn) -> bool {
     return result;
 }
 
-/// What was written to the pseudo-terminal so far (within onTerminal())
-auto readTerminal() -> std::string {
-    std::string output;
-    ::pollfd pfd{.fd = terminalMaster, .events = POLLIN, .revents = 0};
-    while (::poll(&pfd, 1, 100) > 0 && (pfd.revents & POLLIN) != 0) {
-        char buffer[4096];
-        auto const n = ::read(terminalMaster, buffer, sizeof(buffer));
-        if (n <= 0) {
-            break;
-        }
-        output.append(buffer, static_cast<std::size_t>(n));
-    }
-    return output;
-}
-
 } // namespace
 
 TEST_SUITE("StdOutSink") {
