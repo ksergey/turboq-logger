@@ -12,10 +12,10 @@
 #include <memory>
 #include <string_view>
 
-#include <turboq_logger/DailyFileSink.h>
-#include <turboq_logger/FileSink.h>
-#include <turboq_logger/Logging.h>
-#include <turboq_logger/StdOutSink.h>
+#include <turboq-logger/DailyFileSink.h>
+#include <turboq-logger/FileSink.h>
+#include <turboq-logger/Logging.h>
+#include <turboq-logger/StdOutSink.h>
 
 int main(int argc, char* argv[]) {
     using namespace turboq::logger;

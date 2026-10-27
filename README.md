@@ -18,9 +18,9 @@ Everything else is fetched automatically at configure time via [CPM.cmake](https
 
 - [turboq](https://github.com/ksergey/turboq) -- message queues (tracks `master`)
 - [fmt](https://github.com/fmtlib/fmt) -- formatting
-- [doctest](https://github.com/doctest/doctest) -- unit tests (`code/turboq_logger/*_test.cpp`); skipped when
+- [doctest](https://github.com/doctest/doctest) -- unit tests (`code/turboq-logger/*_test.cpp`); skipped when
   `-Dturboq_logger_BUILD_TESTS=OFF`
-- [Google Benchmark](https://github.com/google/benchmark) -- benchmarks (`code/turboq_logger/*_bm.cpp`); skipped
+- [Google Benchmark](https://github.com/google/benchmark) -- benchmarks (`code/turboq-logger/*_bm.cpp`); skipped
   when `-Dturboq_logger_BUILD_BENCHMARKS=OFF`
 
 Set `CPM_SOURCE_CACHE` to share downloaded dependencies between build directories and projects.
@@ -65,8 +65,8 @@ target_link_libraries(your_app PRIVATE turboq::logger)
 ### Usage
 
 ```cpp
-#include <turboq_logger/DailyFileSink.h>
-#include <turboq_logger/Logging.h>
+#include <turboq-logger/DailyFileSink.h>
+#include <turboq-logger/Logging.h>
 
 using namespace turboq::logger;
 

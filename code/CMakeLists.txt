@@ -40,8 +40,8 @@ if (turboq_logger_SANITIZER_FLAGS)
         PUBLIC ${turboq_logger_SANITIZER_FLAGS})
 endif()
 
-file(GLOB_RECURSE Sources "${CMAKE_CURRENT_SOURCE_DIR}/turboq_logger/*.cpp")
-file(GLOB_RECURSE Headers "${CMAKE_CURRENT_SOURCE_DIR}/turboq_logger/*.h")
+file(GLOB_RECURSE Sources "${CMAKE_CURRENT_SOURCE_DIR}/turboq-logger/*.cpp")
+file(GLOB_RECURSE Headers "${CMAKE_CURRENT_SOURCE_DIR}/turboq-logger/*.h")
 
 if (turboq_logger_BUILD_TESTS)
     TurboQAddTestsFromSourceList(Sources
