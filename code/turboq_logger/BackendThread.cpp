@@ -65,7 +65,7 @@ BackendThread::State::State() {
 
 void BackendThread::waitAtLeast(std::atomic<std::uint64_t>& counter, std::uint64_t value) noexcept {
     for (auto current = counter.load(std::memory_order_acquire); current < value;
-        current = counter.load(std::memory_order_acquire)) {
+         current = counter.load(std::memory_order_acquire)) {
         counter.wait(current, std::memory_order_acquire);
     }
 }
@@ -149,7 +149,9 @@ void BackendThread::run(std::stop_token const& stop, State& s, BackendThreadOpti
         void operator()(LogMessageEvent const& event) {
             sink->write(event.location, event.level, Clock::toTimeSpec(event.timestamp), event.threadID, event.message);
         }
-        void operator()([[maybe_unused]] LogValueEvent const& event) {}
+        void operator()([[maybe_unused]] LogMetricEvent const& event) {
+            // FIXME: how to store metrics
+        }
     };
     auto const currentSink = [&]() -> Sink& {
         return sink ? *sink : nullSink;

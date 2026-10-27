@@ -49,7 +49,7 @@ struct RecordingSink {
         events.emplace_back(event.message);
     }
 
-    void operator()([[maybe_unused]] LogValueEvent const& event) {}
+    void operator()([[maybe_unused]] LogMetricEvent const& event) {}
 };
 
 static_assert(EventSink<RecordingSink>);

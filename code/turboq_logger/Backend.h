@@ -34,18 +34,18 @@ struct LogMessageEvent {
     std::string_view message;
 };
 
-struct LogValueEvent {
+struct LogMetricEvent {
     Clock::Timestamp timestamp;
     std::thread::id threadID;
-    unsigned id;
-    double value;
+    // TODO: other fields from MetricMetadata
 };
 
 template <typename SinkFn>
-concept EventSink = requires(SinkFn& sink, LogMessageEvent const& logMessageEvent, LogValueEvent const& logValueEvent) {
-    sink(logMessageEvent);
-    sink(logValueEvent);
-};
+concept EventSink =
+    requires(SinkFn& sink, LogMessageEvent const& logMessageEvent, LogMetricEvent const& logMetricEvent) {
+        sink(logMessageEvent);
+        sink(logMetricEvent);
+    };
 
 namespace detail {
 
@@ -142,14 +142,12 @@ private:
                 .message = std::string_view{messageBuffer_.data(), messageBuffer_.size()},
             });
         } break;
-        case TransitEventType::Value: {
-            auto const meta = Codec<ValueMetadata const*>::decode(src);
-            auto const value = Codec<double>::decode(src);
-            sink(LogValueEvent{
+        case TransitEventType::Metric: {
+            [[maybe_unused]] auto const meta = Codec<MetricMetadata const*>::decode(src);
+            // TODO: read metric value and pass to sink event
+            sink(LogMetricEvent{
                 .timestamp = header.timestamp,
                 .threadID = header.threadID,
-                .id = meta->id,
-                .value = value,
             });
         } break;
         }

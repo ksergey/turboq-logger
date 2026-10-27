@@ -101,6 +101,7 @@ time. The default pattern gives
 // a pattern of your own
 BackendThread::setSink(std::make_shared<StdOutSink>(
     makeFormatter<"{time:%T}.{ms:03} {level:>7} {file}:{line} {message}">()));
+```
 
 | Field | Value | Format spec examples |
 |---|---|---|

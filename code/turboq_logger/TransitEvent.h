@@ -17,7 +17,7 @@ namespace turboq::logger {
 
 enum class TransitEventType {
     Message,
-    Value,
+    Metric,
 };
 
 struct TransitEvent {
@@ -47,12 +47,13 @@ struct MessageMetadata {
 
 static_assert(std::is_trivially_copyable_v<MessageMetadata>);
 
-struct ValueMetadata {
-    /// Value identifier
-    unsigned id;
-    // TODO: value type (int, double, etc)?
+struct MetricMetadata {
+    std::string_view name;
+    // TODO: metric name
+    //       matric id (?)
+    //       matric type or always double (?)
 };
 
-static_assert(std::is_trivially_copyable_v<ValueMetadata>);
+static_assert(std::is_trivially_copyable_v<MetricMetadata>);
 
 } // namespace turboq::logger

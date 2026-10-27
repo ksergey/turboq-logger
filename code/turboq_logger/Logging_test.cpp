@@ -20,7 +20,7 @@ struct CollectingSink {
     void operator()(LogMessageEvent const& event) {
         messages.emplace_back(event.message);
     }
-    void operator()(LogValueEvent const&) {}
+    void operator()(LogMetricEvent const&) {}
 };
 
 /// Everything logged so far by any thread, in order per thread

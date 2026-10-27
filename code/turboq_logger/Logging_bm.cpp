@@ -40,7 +40,7 @@ constexpr auto batchSize(std::size_t payloadSize = 64) noexcept -> std::int64_t 
 
 struct DiscardEvents {
     void operator()(LogMessageEvent const&) {}
-    void operator()(LogValueEvent const&) {}
+    void operator()(LogMetricEvent const&) {}
 };
 
 /// Run logOne(i) in batches; between batches, outside the timing, the queue is drained
