@@ -47,7 +47,8 @@ if (turboq_logger_BUILD_TESTS)
     TurboQAddTestsFromSourceList(Sources
         PREFIX ${TargetName}
         COMPILE_OPTIONS -Wall -Wextra -g
-        LIBS doctest::doctest_with_main Threads::Threads ${TargetName})
+        # util: openpty() in StdOutSink_test.cpp (checking that ColorMode::Auto resolves on a terminal)
+        LIBS doctest::doctest_with_main Threads::Threads util ${TargetName})
 endif()
 
 if (turboq_logger_BUILD_BENCHMARKS)
