@@ -23,7 +23,7 @@ enum class LogLevel : std::uint8_t {
     TraceL3,
 };
 
-/// Number of LogLevel values (index of FormatterOptions::levelStyles)
+/// Number of LogLevel values
 inline constexpr std::size_t kLogLevelCount = 8;
 
 constexpr auto logLevelToString(LogLevel value) noexcept -> std::string_view {

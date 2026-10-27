@@ -36,7 +36,6 @@ struct DailyFileSinkOptions {
 ///   next one by the first message of the next day: a day without messages has no file.
 /// - Files are opened for appending: a restart the same day continues today's file. Missing
 ///   parent directories are created.
-/// - ColorMode::Auto means no colors.
 class DailyFileSink final : public Sink {
 private:
     std::filesystem::path prefix_;

@@ -40,12 +40,17 @@ LogFile::LogFile(std::filesystem::path path, Mode mode, std::size_t bufferSize) 
 
 void LogFile::write(std::string_view data) {
     if (std::fwrite(data.data(), 1, data.size(), file_.get()) != data.size()) [[unlikely]] {
+        // the failed write sets the stream's error indicator, which would make every following
+        // fwrite() fail without touching the file (e.g. after a one-off disk-full or I/O error).
+        // Clear it before throwing, so the next write() retries for real.
+        ::clearerr(file_.get());
         throwError("can't write to", path_);
     }
 }
 
 void LogFile::flush(bool sync) {
     if (std::fflush(file_.get()) != 0) [[unlikely]] {
+        ::clearerr(file_.get()); // as in write(): let a later flush() retry
         throwError("can't flush", path_);
     }
     if (sync && ::fsync(::fileno(file_.get())) != 0) [[unlikely]] {

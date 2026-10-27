@@ -21,10 +21,6 @@ auto threadNumber(std::thread::id const& threadID) noexcept -> std::uint64_t {
     return std::bit_cast<::pthread_t>(threadID);
 }
 
-void append(fmt::memory_buffer& out, std::string_view text) {
-    out.append(text.data(), text.data() + text.size());
-}
-
 } // namespace
 
 void FormatterBase::format(fmt::memory_buffer& out, std::source_location const& location, LogLevel level,

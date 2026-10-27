@@ -5,7 +5,6 @@
 
 #include <memory>
 
-#include <fmt/color.h>
 #include <fmt/format.h>
 
 #include "Formatter.h"
@@ -15,10 +14,7 @@ namespace turboq::logger {
 
 /// Writes messages to stdout, one line each (see FormatterBase, Formatter).
 ///
-///     BackendThread::setSink(std::make_shared<StdOutSink>()); // the level colored on a terminal
-///
-/// ColorMode::Auto colors when stdout is a terminal and the NO_COLOR environment variable is unset
-/// or empty (https://no-color.org).
+///     BackendThread::setSink(std::make_shared<StdOutSink>());
 ///
 /// Goes through stdio: line-buffered when stdout is a terminal, fully buffered when it is a pipe
 /// or a file -- flush() (BackendThread::flush(), stop()) pushes the buffer out.

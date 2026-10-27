@@ -5,13 +5,10 @@
 
 #include <cstdio>
 #include <cstdlib>
+#include <ctime>
 #include <string>
 #include <thread>
 
-#include <optional>
-
-#include <poll.h>
-#include <pty.h>
 #include <unistd.h>
 
 #include <doctest/doctest.h>
@@ -48,56 +45,6 @@ auto captureStdout(Fn&& fn) -> std::string {
 }
 
 constexpr auto kLocation = std::source_location::current();
-
-/// Sets (or unsets, with nullptr) an environment variable for a scope
-class EnvVar {
-private:
-    std::string name_;
-    std::optional<std::string> previous_;
-
-public:
-    EnvVar(char const* name, char const* value) : name_{name} {
-        if (auto const* const current = std::getenv(name)) {
-            previous_ = current;
-        }
-        if (value != nullptr) {
-            ::setenv(name, value, 1);
-        } else {
-            ::unsetenv(name);
-        }
-    }
-    ~EnvVar() {
-        if (previous_) {
-            ::setenv(name_.c_str(), previous_->c_str(), 1);
-        } else {
-            ::unsetenv(name_.c_str());
-        }
-    }
-};
-
-int terminalMaster = -1; // master side of the pseudo-terminal of onTerminal()
-
-/// Run fn() with stdout on a pseudo-terminal; return its result
-template <typename Fn>
-auto onTerminal(Fn&& fn) -> bool {
-    int master = -1;
-    int slave = -1;
-    REQUIRE_EQ(::openpty(&master, &slave, nullptr, nullptr, nullptr), 0);
-    std::fflush(stdout);
-    auto const saved = ::dup(STDOUT_FILENO);
-    ::dup2(slave, STDOUT_FILENO);
-    terminalMaster = master;
-
-    auto const result = fn();
-
-    std::fflush(stdout);
-    ::dup2(saved, STDOUT_FILENO);
-    ::close(saved);
-    ::close(slave);
-    ::close(master);
-    terminalMaster = -1;
-    return result;
-}
 
 } // namespace
 

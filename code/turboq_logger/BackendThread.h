@@ -45,7 +45,7 @@ inline thread_local bool isBackendThread = false;
 /// Everything is static: there is one backend per process, and the code logging (through a macro
 /// and a log function) knows nothing about it. The application configures it once:
 ///
-///     BackendThread::setSink(std::make_shared<DailyFileSink>("logs/app-{:%Y-%m-%d}.log"));
+///     BackendThread::setSink(std::make_shared<DailyFileSink>("logs/app"));
 ///     BackendThread::start(); // optional: see ensureStarted()
 ///     ...
 ///     BackendThread::stop();  // optional: done at exit

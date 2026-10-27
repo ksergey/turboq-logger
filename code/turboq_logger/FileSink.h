@@ -30,8 +30,8 @@ struct FileSinkOptions {
 ///     BackendThread::setSink(std::make_shared<FileSink>("logs/app.log"));
 ///
 /// The file is opened on construction (so a bad path fails right away), for appending unless
-/// FileSinkOptions::truncate. Missing parent directories are created. ColorMode::Auto means no
-/// colors. For a new file every day, see DailyFileSink.
+/// FileSinkOptions::truncate. Missing parent directories are created. For a new file every day,
+/// see DailyFileSink.
 class FileSink final : public Sink {
 private:
     detail::LogFile file_;

@@ -37,9 +37,8 @@ struct LineFields {
     std::string_view message;
 };
 
-/// Formats a log message as one text line; what the text sinks take. Colors the whole line (see
-/// ColorMode) around the text of formatLine(). Not thread-safe: one formatter per sink (sinks run
-/// on the backend thread).
+/// Formats a log message as one text line; what the text sinks take. Not thread-safe: one
+/// formatter per sink (sinks run on the backend thread).
 class FormatterBase {
 public:
     FormatterBase() = default;

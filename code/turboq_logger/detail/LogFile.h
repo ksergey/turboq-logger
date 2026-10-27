@@ -47,10 +47,12 @@ public:
         return path_;
     }
 
-    /// Append data to the buffer (written out when it fills up). Throws std::system_error.
+    /// Append data to the buffer (written out when it fills up). Throws std::system_error. On a
+    /// failed write the stream is cleared for the next write() to retry.
     void write(std::string_view data);
 
-    /// Write the buffer out (fflush()), and fsync() if sync. Throws std::system_error.
+    /// Write the buffer out (fflush()), and fsync() if sync. Throws std::system_error (a failed
+    /// fflush() leaves the stream cleared for the next flush() to retry).
     void flush(bool sync);
 };
 

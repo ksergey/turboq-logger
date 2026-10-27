@@ -47,7 +47,7 @@ if (turboq_logger_BUILD_TESTS)
     TurboQAddTestsFromSourceList(Sources
         PREFIX ${TargetName}
         COMPILE_OPTIONS -Wall -Wextra -g
-        LIBS doctest::doctest_with_main Threads::Threads util ${TargetName})
+        LIBS doctest::doctest_with_main Threads::Threads ${TargetName})
 endif()
 
 if (turboq_logger_BUILD_BENCHMARKS)
