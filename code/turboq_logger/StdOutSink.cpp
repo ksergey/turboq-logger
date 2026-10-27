@@ -36,8 +36,7 @@ auto noColorRequested() noexcept -> bool {
 } // namespace
 
 StdOutSink::StdOutSink(std::unique_ptr<FormatterBase> formatter, StdOutSinkOptions const& options)
-    : colorMode_{options.colors},
-      colorsEnabled_{options.colors == ColorMode::Always},
+    : colorMode_{options.colors}, colorsEnabled_{options.colors == ColorMode::Always},
       formatter_{formatter ? std::move(formatter) : std::make_unique<DefaultFormatter>()} {
     if (colorMode_ == ColorMode::Auto) {
         colorsEnabled_ = ::isatty(STDOUT_FILENO) == 1 && !noColorRequested();

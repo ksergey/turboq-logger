@@ -65,8 +65,7 @@ private:
 public:
     /// nullptr: DefaultFormatter. ColorMode::Auto resolves here: colors iff stdout is a terminal
     /// and NO_COLOR isn't set to a non-empty value.
-    explicit StdOutSink(std::unique_ptr<FormatterBase> formatter = nullptr,
-        StdOutSinkOptions const& options = {});
+    explicit StdOutSink(std::unique_ptr<FormatterBase> formatter = nullptr, StdOutSinkOptions const& options = {});
 
     [[nodiscard]] auto formatter() const noexcept -> FormatterBase const& {
         return *formatter_;

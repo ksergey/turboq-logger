@@ -8,6 +8,7 @@
 
 #include <turboq/Platform.h>
 
+#include "Backend.h"
 #include "BackendThread.h"
 #include "Clock.h"
 #include "Codec.h"

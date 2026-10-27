@@ -37,6 +37,12 @@ int main(int argc, char* argv[]) {
         tq_trace("Point at {}.{}", 10, 15.0);
         tq_trace_l2("Done");
 
+        tq_error("Error");
+        tq_warn("Warnig");
+        tq_notice("Notice");
+        tq_info("Info");
+        tq_debug("Debug");
+
         BackendThread::stop();
 
     } catch (std::exception const& e) {
