@@ -20,26 +20,19 @@ endif()
 
 include(cmake/GetCPM.cmake)
 
+CPMAddPackage("gh:ksergey/turboq#master")
 CPMAddPackage("gh:fmtlib/fmt#12.2.0")
-CPMAddPackage(
-    NAME turboq
-    GITHUB_REPOSITORY ksergey/turboq
-    GIT_TAG master
-    # same instrumentation for turboq as for this library
-    OPTIONS "turboq_SANITIZER ${turboq_logger_SANITIZER}" "turboq_TSAN ${turboq_logger_TSAN}")
 
 if (turboq_logger_BUILD_TESTS)
-    CPMAddPackage("gh:doctest/doctest@2.5.2")
+    CPMAddPackage("gh:doctest/doctest@2.5.3")
     enable_testing()
 endif()
 
 if (turboq_logger_BUILD_BENCHMARKS)
     CPMAddPackage(
-        NAME benchmark
-        GITHUB_REPOSITORY google/benchmark
-        VERSION 1.10.0
-        OPTIONS "BENCHMARK_ENABLE_TESTING OFF" "BENCHMARK_ENABLE_GTEST_TESTS OFF" "BENCHMARK_ENABLE_INSTALL OFF"
-            "BENCHMARK_ENABLE_WERROR OFF" "BENCHMARK_INSTALL_DOCS OFF")
+        URI "gh:google/benchmark@1.10.0"
+        OPTIONS "BENCHMARK_ENABLE_TESTING OFF"
+    )
 endif()
 
 add_subdirectory(code)

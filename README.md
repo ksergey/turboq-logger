@@ -25,37 +25,11 @@ Everything else is fetched automatically at configure time via [CPM.cmake](https
 
 Set `CPM_SOURCE_CACHE` to share downloaded dependencies between build directories and projects.
 
-### CMake options
-
-| Option | Default | Effect |
-|---|---|---|
-| `turboq_logger_TSC_CLOCK` | `ON` on x86-64, `OFF` elsewhere | Timestamp log entries with the TSC (`rdtsc`, x86-64 only; needs an invariant TSC) instead of `clock_gettime(CLOCK_REALTIME)`. Defines `TURBOQ_LOGGER_TSC_CLOCK` publicly, so code linking `turboq::logger` sees the same choice. Turning it on for another architecture is a configure error. |
-| `turboq_logger_BUILD_TESTS` | `ON` | Build `*_test.cpp` files as doctest executables and register them with `ctest`. |
-| `turboq_logger_BUILD_BENCHMARKS` | `ON` | Build `*_bm.cpp` files as [Google Benchmark](https://github.com/google/benchmark) executables (fetched when on). |
-| `turboq_logger_SANITIZER` | `OFF` | Build with AddressSanitizer, LeakSanitizer and UndefinedBehaviorSanitizer (turboq too). |
-| `turboq_logger_TSAN` | `OFF` | Build with ThreadSanitizer (turboq too). Not together with `turboq_logger_SANITIZER`. |
-
-```bash
-cmake -B build -DCMAKE_CXX_COMPILER=g++-14
-cmake --build build
-ctest --test-dir build/code --output-on-failure
-```
-
-To develop against a local turboq checkout instead of the fetched one:
-
-```bash
-cmake -B build -DCPM_turboq_SOURCE=/path/to/turboq
-```
-
 ### Integration
 
 ```cmake
 include(cmake/GetCPM.cmake)
-CPMAddPackage(
-    NAME turboq-logger
-    GITHUB_REPOSITORY ksergey/turboq-logger
-    GIT_TAG master
-    OPTIONS "turboq_logger_BUILD_TESTS OFF")
+CPMAddPackage("gh/ksergey/turboq-logger#master")
 
 target_link_libraries(your_app PRIVATE turboq::logger)
 ```
