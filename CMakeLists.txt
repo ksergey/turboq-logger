@@ -23,7 +23,8 @@ include(cmake/GetCPM.cmake)
 CPMAddPackage("gh:fmtlib/fmt#12.2.0")
 CPMAddPackage(
     NAME turboq
-    SOURCE_DIR /data/data/com.termux/files/home/turboq
+    GITHUB_REPOSITORY ksergey/turboq
+    GIT_TAG master
     # same instrumentation for turboq as for this library
     OPTIONS "turboq_SANITIZER ${turboq_logger_SANITIZER}" "turboq_TSAN ${turboq_logger_TSAN}")
 
