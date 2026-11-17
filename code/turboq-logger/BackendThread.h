@@ -34,8 +34,9 @@ struct BackendThreadOptions {
 ///   previous sink is flushed, then messages go to the new one. Until a sink is set, messages are
 ///   discarded.
 /// - The thread starts with start(), or by itself on the first log call: the log function calls
-///   ensureStarted(). Auto start is on by default; setAutoStart(false) turns it off, and so does
-///   stop(), so late messages during shutdown don't restart the thread.
+///   ensureStarted(). Auto start is on by default; setAutoStart(false) turns it off. stop() does
+///   not touch it, so messages logged after stop() restart the thread; for strict shutdown
+///   semantics call setAutoStart(false) before stop().
 /// - flush() waits until everything the calling thread logged has reached the sink, and the sink
 ///   has been flushed.
 /// - stop() -- and the end of the program -- reads every message still in the queues (those of
@@ -64,14 +65,18 @@ public:
     static void start(BackendThreadOptions const& options = {});
 
     /// Read every message still in the queues, pass them to the sink, flush it and join the thread.
-    /// Turns auto start off. Does nothing if the thread isn't running. Thread-safe. Throws
-    /// std::logic_error if called from the sink (the backend thread), which can't join itself.
+    /// Does nothing if the thread isn't running. Thread-safe. Throws std::logic_error if called
+    /// from the sink (the backend thread), which can't join itself.
+    ///
+    /// Auto start stays on, so messages logged after stop() restart the thread. For strict
+    /// shutdown semantics -- late messages during shutdown must not restart the thread -- call
+    /// setAutoStart(false) before stop().
     static void stop();
 
     /// Start the thread if it isn't running and auto start is on -- what the log function calls on
     /// every log call, so the thread starts on the first message. A single atomic load once the
     /// thread runs (or auto start is off). Never throws: if the thread can't be started, the error
-    /// is reported on stderr and auto start is turned off.
+    /// is reported on stderr (at most once a second) and the next log call retries.
     static void ensureStarted() noexcept;
 
     /// Turn auto start (see ensureStarted()) on or off; options are what an automatic start uses

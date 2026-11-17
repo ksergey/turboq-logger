@@ -92,7 +92,6 @@ void BackendThread::startLocked(State& s, BackendThreadOptions const& options) {
 }
 
 void BackendThread::stopLocked(State& s) noexcept {
-    s.autoStart.store(false, std::memory_order_relaxed);
     if (!s.running.load(std::memory_order_relaxed)) {
         return;
     }
@@ -112,7 +111,8 @@ TURBOQ_NO_INLINE void BackendThread::startAutomatically(State& s) noexcept {
     try {
         startLocked(s, s.autoStartOptions);
     } catch (...) {
-        s.autoStart.store(false, std::memory_order_relaxed);
+        // no autoStart change: a transient failure (e.g. of the first attempt) must not disable
+        // auto start forever -- the next log call retries (the report is rate limited)
         detail::reportBackendError(std::current_exception());
     }
 }

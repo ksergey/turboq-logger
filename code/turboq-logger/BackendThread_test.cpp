@@ -105,7 +105,7 @@ struct Cleanup {
 
 TEST_SUITE("BackendThread") {
 
-    TEST_CASE("the thread starts on the first message, stop() delivers everything and turns auto start off") {
+    TEST_CASE("the thread starts on the first message, stop() delivers everything, late messages restart it") {
         Cleanup cleanup;
         auto sink = std::make_shared<TestSink>();
         BackendThread::setSink(sink);
@@ -123,7 +123,24 @@ TEST_SUITE("BackendThread") {
         CHECK_GE(sink->flushes(), 1);
 
         TURBOQ_LOGGER_LOG_CALL(LogLevel::Info, "late");
-        CHECK_FALSE(BackendThread::isRunning()); // auto start is off after stop()
+        BackendThread::flush();
+        CHECK(BackendThread::isRunning()); // auto start is still on: stop() restarted the thread
+        CHECK_EQ(sink->count("late"), 1);
+    }
+
+    TEST_CASE("setAutoStart(false) before stop(): late messages don't restart the thread") {
+        Cleanup cleanup;
+        auto sink = std::make_shared<TestSink>();
+        BackendThread::setSink(sink);
+        BackendThread::start();
+        TURBOQ_LOGGER_LOG_CALL(LogLevel::Info, "before stop");
+        BackendThread::setAutoStart(false); // strict shutdown opt-in, before stop()
+        BackendThread::stop();
+        CHECK_EQ(sink->count("before stop"), 1);
+        CHECK_FALSE(BackendThread::isRunning());
+
+        TURBOQ_LOGGER_LOG_CALL(LogLevel::Info, "late");
+        CHECK_FALSE(BackendThread::isRunning()); // strict shutdown: no restart
     }
 
     TEST_CASE("an exception from the sink skips that message only: later ones are delivered") {
